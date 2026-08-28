@@ -1,0 +1,2 @@
+Exportacion: Bananos de la variedad Cavendish recién cosechados y que están aptos para exportar
+Rechazo: Bananos de la variedad Cavendish recién cosechados y que NO están aptos para exportar

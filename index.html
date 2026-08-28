@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BananaCheck AI — Análisis con Ollama</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --verde: #1B4332;
+    --verde-medio: #2D6A4F;
+    --verde-claro: #52B788;
+    --amarillo: #F4C430;
+    --amarillo-claro: #FFF3B0;
+    --crema: #FFFBF0;
+    --carbon: #1A1A1A;
+    --gris: #6B7280;
+    --rojo: #DC2626;
+    --naranja: #EA580C;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--crema);
+    color: var(--carbon);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--verde);
+    padding: 0 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  .header-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 90px;
+    gap: 1rem;
+    position: relative;
+  }
+  .logo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    color: var(--amarillo);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+  .logo span { color: white; font-weight: 400; font-size: 0.95rem; }
+  .badge-local {
+    background: rgba(82,183,136,0.2);
+    border: 1px solid var(--verde-claro);
+    color: var(--verde-claro);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.25rem 0.7rem;
+    border-radius: 100px;
+    white-space: nowrap;
+    position: absolute;
+    right: 0;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, var(--verde) 0%, var(--verde-medio) 60%, #40916C 100%);
+    padding: 2.5rem 1.5rem 2rem;
+    text-align: center;
+  }
+  .hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.4rem;
+  }
+  .hero h1 em { color: var(--amarillo); font-style: normal; }
+  .hero p {
+    color: rgba(255,255,255,0.8);
+    font-size: 0.95rem;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--gris);
+    margin-right: 0.35rem;
+    flex-shrink: 0;
+  }
+  .status-dot.ok  { background: var(--verde-claro); }
+  .status-dot.bad { background: var(--rojo); }
+  #statusText { font-size: 0.78rem; color: var(--gris); }
+
+  /* ── GRID PRINCIPAL ── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.75rem;
+  }
+  @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 1.25rem 1rem; } }
+
+  /* ── CARDS ── */
+  .card {
+    background: white;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 18px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+  }
+  .card-header {
+    padding: 1.4rem 1.6rem 0.9rem;
+    border-bottom: 1px solid #F3F4F6;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+  }
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+  }
+  .card-icon.fruta   { background: var(--amarillo-claro); }
+  .card-icon.terreno { background: #DCFCE7; }
+  .card-header h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+  }
+  .card-header p { font-size: 0.78rem; color: var(--gris); line-height: 1.4; }
+  .card-body { padding: 1.4rem 1.6rem; flex: 1; display: flex; flex-direction: column; }
+
+  /* ── DROP ZONE ── */
+  .drop-zone {
+    border: 2px dashed #D1D5DB;
+    border-radius: 13px;
+    padding: 1.6rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    background: #FAFAFA;
+    position: relative;
+    transition: border-color 0.2s, background 0.2s;
+    user-select: none;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--verde-claro);
+    background: #F0FDF4;
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 2rem; margin-bottom: 0.35rem; display: block; }
+  .drop-zone p { font-size: 0.8rem; color: var(--gris); }
+  .drop-zone strong { color: var(--verde); }
+
+  .preview-wrap {
+    position: relative;
+    margin-bottom: 0.9rem;
+    display: none;
+  }
+  .preview-img {
+    width: 100%; max-height: 200px; object-fit: cover;
+    border-radius: 10px; display: block;
+  }
+  .btn-remove-img {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(0,0,0,0.55); color: white;
+    border: none; border-radius: 50%; width: 26px; height: 26px;
+    font-size: 0.85rem; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; line-height: 1;
+  }
+  .btn-remove-img:hover { background: rgba(220,38,38,0.85); }
+
+  /* ── BOTÓN ANALIZAR ── */
+  .btn-analyze {
+    width: 100%; padding: 0.75rem;
+    background: var(--verde); color: white; border: none;
+    border-radius: 11px; font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.92rem; font-weight: 600; cursor: pointer;
+    margin-top: auto;
+    padding-top: 0.75rem;
+    display: flex; align-items: center;
+    justify-content: center; gap: 0.45rem;
+    transition: background 0.18s, transform 0.1s;
+  }
+  .btn-analyze:hover:not(:disabled) { background: var(--verde-medio); }
+  .btn-analyze:active:not(:disabled) { transform: scale(0.98); }
+  .btn-analyze:disabled { background: #9CA3AF; cursor: not-allowed; }
+
+  /* ── SPINNER ── */
+  .spinner {
+    width: 15px; height: 15px;
+    border: 2.5px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.7s linear infinite; display: none;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── BARRA DE PROGRESO ── */
+  .progress-container {
+    margin-top: 0.7rem;
+    display: none;
+  }
+  .progress-bar-wrap {
+    background: #E5E7EB;
+    border-radius: 100px;
+    height: 5px;
+    overflow: hidden;
+    margin-bottom: 0.35rem;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--verde-claro);
+    border-radius: 100px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .progress-text {
+    font-size: 0.74rem;
+    color: var(--gris);
+    text-align: center;
+  }
+
+  /* ── TIEMPO ── */
+  .timer-text {
+    font-size: 0.72rem;
+    color: var(--gris);
+    text-align: center;
+    margin-top: 0.2rem;
+    display: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── ERROR ── */
+  .error-msg {
+    color: var(--rojo); font-size: 0.8rem;
+    margin-top: 0.6rem; display: none;
+    padding: 0.55rem 0.85rem;
+    background: #FEF2F2;
+    border-radius: 8px;
+    border-left: 3px solid var(--rojo);
+    line-height: 1.45;
+  }
+
+  /* ── RESULTADO ── */
+  .result-box {
+    margin-top: 1.1rem;
+    border-radius: 13px;
+    overflow: hidden;
+    display: none;
+    border: 1px solid #E5E7EB;
+  }
+  .result-header {
+    padding: 0.7rem 1rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 0.87rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .result-header.ok  { background: #DCFCE7; color: #15803D; }
+  .result-header.warn { background: #FEF3C7; color: #92400E; }
+  .result-header.err  { background: #FEE2E2; color: #B91C1C; }
+  .result-body {
+    padding: 1rem 1.1rem;
+    background: white;
+    font-size: 0.84rem;
+    line-height: 1.65;
+    color: #374151;
+  }
+
+  /* ── TARJETAS EXPORTACIÓN ── */
+  .export-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+  }
+  @media (max-width: 480px) { .export-cards { grid-template-columns: 1fr; } }
+  .export-card {
+    border-radius: 11px;
+    padding: 0.8rem 1rem;
+    border: 1.5px solid;
+    text-align: center;
+  }
+  .export-card.si     { background: #DCFCE7; border-color: #86EFAC; }
+  .export-card.no     { background: #FEE2E2; border-color: #FCA5A5; }
+  .export-card.dudoso { background: #FEF3C7; border-color: #FDE68A; }
+  .export-titulo {
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--gris); margin-bottom: 0.3rem;
+  }
+  .export-valor {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem; font-weight: 700;
+  }
+  .export-card.si     .export-valor { color: #15803D; }
+  .export-card.no     .export-valor { color: #B91C1C; }
+  .export-card.dudoso .export-valor { color: #92400E; }
+
+  /* ── TABLA FICHA ── */
+  .ficha-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-bottom: 0.4rem;
+  }
+  .ficha-tabla td {
+    padding: 0.48rem 0.6rem;
+    border-bottom: 1px solid #F3F4F6;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .ficha-tabla tr:last-child td { border-bottom: none; }
+  .ficha-tabla td:first-child {
+    font-weight: 600;
+    color: var(--verde);
+    white-space: nowrap;
+    width: 40%;
+    padding-right: 0.8rem;
+  }
+
+  /* ── COLOR CHIP ── */
+  .color-chip {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-weight: 600;
+  }
+  .color-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.12); flex-shrink: 0;
+  }
+
+  /* ── INDICADOR MADUREZ ── */
+  .madurez-bar {
+    display: flex; gap: 3px; margin: 0.3rem 0;
+  }
+  .madurez-seg {
+    flex: 1; height: 8px; border-radius: 100px;
+    background: #E5E7EB;
+  }
+  .madurez-seg.act { background: var(--amarillo); }
+  .madurez-seg.act.verde-seg { background: #16a34a; }
+  .madurez-seg.act.pinton-seg { background: #ca8a04; }
+  .madurez-seg.act.maduro-seg { background: #ea580c; }
+
+  /* ── AYUDA ── */
+  .help-box {
+    background: var(--amarillo-claro);
+    border: 1px solid #FDE68A;
+    border-radius: 11px;
+    padding: 0.8rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.76rem;
+    line-height: 1.55;
+    color: #78350F;
+  }
+  .help-box code {
+    background: rgba(0,0,0,0.08);
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    font-size: 0.74rem;
+  }
+
+  /* ── BOTÓN CANCELAR ── */
+  .btn-cancel {
+    display: none;
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    background: transparent;
+    color: var(--gris);
+    border: 1px solid #D1D5DB;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-cancel:hover { background: #FEF2F2; color: var(--rojo); border-color: var(--rojo); }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 1.75rem;
+    color: var(--gris);
+    font-size: 0.78rem;
+    border-top: 1px solid #E5E7EB;
+    margin-top: 0.5rem;
+  }
+
+  /* ── INFO ACCESO RED ── */
+  .network-info {
+    background: white;
+    border-top: 1px solid #E5E7EB;
+  }
+  .network-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0.8rem 1.5rem;
+    font-size: 0.78rem;
+    color: var(--gris);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .network-inner strong { color: var(--carbon); }
+  #localIpSpan { font-family: monospace; font-size: 0.78rem; }
+
+  /* ── RESPONSIVO ── */
+  @media (max-width: 480px) {
+    .header-inner { height: 54px; }
+    .logo { font-size: 1rem; }
+    .hero { padding: 1.75rem 1rem 1.5rem; }
+    .card-body { padding: 1.1rem 1.1rem; }
+    .config-inner { gap: 0.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">🍌 BananaCheck <span>AI Local</span></div>
+    <div class="badge-local">⚡ Ollama Local</div>
+  </div>
+</header>
+
+
+
+<!-- CONFIG OCULTA -->
+<input type="hidden" id="ollamaUrl" value="">
+<input type="hidden" id="modeloSelect" value="llava">
+<span id="statusDot" style="display:none"></span>
+<span id="statusText" style="display:none"></span>
+
+<!-- MAIN GRID -->
+<main>
+
+  <!-- CARD FRUTA -->
+  <div class="card" id="fruta">
+    <div class="card-header">
+      <div class="card-icon fruta">🍌</div>
+      <div>
+        <h2>Análisis de la Fruta</h2>
+        <p>Color exacto, madurez (escala 1-7), manchas, golpes y aptitud de exportación.</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="help-box">
+        Sube una foto clara del banano con buena iluminación. El sistema analiza color, textura, defectos y calidad de exportación según normas FAO/UNECE y AUGURA Colombia.
+      </div>
+
+      <div class="preview-wrap" id="previewWrapFruta">
+        <img class="preview-img" id="previewFruta" alt="Vista previa banano">
+        <button class="btn-remove-img" onclick="limpiarImagen('Fruta')" title="Quitar imagen">✕</button>
+      </div>
+
+      <div class="drop-zone" id="dropFruta">
+        <input type="file" id="fileFruta" accept="image/jpeg,image/png,image/webp,image/gif">
+        <span class="drop-icon">📷</span>
+        <p><strong>Haz clic o arrastra</strong> una foto del banano</p>
+        <p style="margin-top:0.25rem; font-size:0.72rem;">JPG, PNG o WEBP · Máx. 10 MB</p>
+      </div>
+
+      <button class="btn-analyze" id="btnFruta" onclick="analizarFruta()">
+        <div class="spinner" id="spinnerFruta"></div>
+        <span id="txtBtnFruta">⚡ Analizar Fruta</span>
+      </button>
+      <button class="btn-cancel" id="cancelFruta" onclick="cancelarAnalisis('Fruta')">✕ Cancelar análisis</button>
+
+      <div class="progress-container" id="progressContFruta">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progressBarFruta"></div></div>
+        <div class="progress-text" id="progressFruta">Iniciando...</div>
+      </div>
+      <div class="timer-text" id="timerFruta"></div>
+      <div class="error-msg"   id="errorFruta"></div>
+      <div class="result-box"  id="resultFruta"></div>
+    </div>
+  </div>
+
+  <!-- CARD TERRENO -->
+  <div class="card" id="terreno">
+    <div class="card-header">
+      <div class="card-icon terreno">🌱</div>
+      <div>
+        <h2>Análisis del Terreno</h2>
+        <p>Humedad, cobertura vegetal, compactación y aptitud para siembra de banano.</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="help-box">
+        Sube una foto del suelo de la parcela. El sistema detecta humedad visible, erosión, malezas y si el terreno es apto para cultivo de banano según parámetros CENIBANANO.
+      </div>
+
+      <div class="preview-wrap" id="previewWrapTerreno">
+        <img class="preview-img" id="previewTerreno" alt="Vista previa terreno">
+        <button class="btn-remove-img" onclick="limpiarImagen('Terreno')" title="Quitar imagen">✕</button>
+      </div>
+
+      <div class="drop-zone" id="dropTerreno">
+        <input type="file" id="fileTerreno" accept="image/jpeg,image/png,image/webp,image/gif">
+        <span class="drop-icon">🌍</span>
+        <p><strong>Haz clic o arrastra</strong> una foto del terreno</p>
+        <p style="margin-top:0.25rem; font-size:0.72rem;">JPG, PNG o WEBP · Máx. 10 MB</p>
+      </div>
+
+      <button class="btn-analyze" id="btnTerreno" onclick="analizarTerreno()">
+        <div class="spinner" id="spinnerTerreno"></div>
+        <span id="txtBtnTerreno">🔬 Analizar Terreno</span>
+      </button>
+      <button class="btn-cancel" id="cancelTerreno" onclick="cancelarAnalisis('Terreno')">✕ Cancelar análisis</button>
+
+      <div class="progress-container" id="progressContTerreno">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progressBarTerreno"></div></div>
+        <div class="progress-text" id="progressTerreno">Iniciando...</div>
+      </div>
+      <div class="timer-text" id="timerTerreno"></div>
+      <div class="error-msg"   id="errorTerreno"></div>
+      <div class="result-box"  id="resultTerreno"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- INFO ACCESO RED -->
+<div class="network-info">
+  <div class="network-inner">
+    📡 <strong>Acceso desde otros dispositivos:</strong>
+    Abre esta página en tu red local desde:
+    <span id="localIpSpan">cargando IP...</span>
+    · Asegúrate que Ollama tenga <code style="font-size:0.75rem;background:#F3F4F6;padding:0.1rem 0.3rem;border-radius:4px;">OLLAMA_HOST=0.0.0.0</code>
+  </div>
+</div>
+
+<footer>
+  BananaCheck AI Local · Modelo LLaVA vía Ollama · Normas FAO/UNECE FFV-24 · AUGURA · CENIBANANO
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════
+   CONFIGURACIÓN Y UTILIDADES
+═══════════════════════════════════════════════ */
+
+// Controlador de abort para cancelar fetch en curso
+const abortControllers = { Fruta: null, Terreno: null };
+
+// URLs a probar en orden
+const OLLAMA_URLS = [
+  'http://127.0.0.1:11434',
+  'http://localhost:11434',
+  'https://sugar-gains-overtake.ngrok-free.dev'
+];
+
+let ollamaUrlDetectada = '';
+
+function getOllamaUrl() {
+  return ollamaUrlDetectada || document.getElementById('ollamaUrl').value || 'http://127.0.0.1:11434';
+}
+function getModelo() {
+  return 'llava';
+}
+
+async function autoDetectarOllama() {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.className = 'status-dot';
+  text.textContent = 'Buscando Ollama...';
+
+  for (const url of OLLAMA_URLS) {
+    try {
+      const hdrs = {};
+      if (url.includes('ngrok')) hdrs['ngrok-skip-browser-warning'] = '1';
+      const res = await fetch(url + '/api/tags', {
+        signal: AbortSignal.timeout(4000),
+        headers: hdrs
+      });
+      if (res.ok) {
+        ollamaUrlDetectada = url;
+        document.getElementById('ollamaUrl').value = url;
+        dot.className = 'status-dot ok';
+        text.textContent = `✓ Ollama conectado — ${url.includes('ngrok') ? 'Ngrok' : 'Local'}`;
+        return true;
+      }
+    } catch { /* intentar siguiente */ }
+  }
+
+  dot.className = 'status-dot bad';
+  text.textContent = '❌ Ollama no encontrado. Ejecuta: OLLAMA_ORIGINS=* ollama serve';
+  return false;
+}
+
+// Muestra la IP local (best-effort)
+async function detectarIpLocal() {
+  const el = document.getElementById('localIpSpan');
+  try {
+    const pc = new RTCPeerConnection({ iceServers: [] });
+    pc.createDataChannel('');
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await new Promise(resolve => {
+      pc.onicecandidate = e => {
+        if (!e.candidate) { resolve(); return; }
+        const m = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+        if (m && !m[1].startsWith('127.')) {
+          el.innerHTML = `<strong>http://${m[1]}:tu-puerto/bananacheck_v2.html</strong>`;
+          pc.close();
+          resolve();
+        }
+      };
+      setTimeout(resolve, 3000);
+    });
+    if (el.textContent === 'cargando IP...') {
+      el.textContent = 'Activa WiFi y recarga para ver la IP local';
+    }
+  } catch {
+    el.textContent = 'Revisa la IP con "ip addr" en terminal';
+  }
+}
+
+async function checkConnection() {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  text.textContent = 'Verificando...';
+  dot.className = 'status-dot';
+  try {
+    const res = await fetch(getOllamaUrl() + '/api/tags', { signal: AbortSignal.timeout(5000), headers: { 'ngrok-skip-browser-warning': '1' } });
+    if (!res.ok) throw new Error('no_ok');
+    const data = await res.json();
+    const modelos = data.models?.map(m => m.name) || [];
+    const modeloActual = getModelo();
+    const tiene = modelos.some(m => m.includes(modeloActual.split(':')[0]));
+    dot.className = 'status-dot ok';
+    text.textContent = tiene
+      ? `Conectado · ${modeloActual} disponible ✓`
+      : `Conectado, pero "${modeloActual}" no está instalado. Instálalo con: ollama pull ${modeloActual}`;
+  } catch (e) {
+    dot.className = 'status-dot bad';
+    if (e.name === 'TimeoutError') {
+      text.textContent = 'Tiempo agotado. ¿Ollama está corriendo? Ejecuta: OLLAMA_ORIGINS=* ollama serve';
+    } else {
+      text.textContent = 'Sin conexión. Ejecuta: OLLAMA_ORIGINS=* ollama serve';
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   IMAGEN: PREVIEW, DRAG & DROP, VALIDACIÓN
+═══════════════════════════════════════════════ */
+
+const MAX_SIZE_MB = 10;
+
+function setupDrop(dropId, fileId, previewId, wrapId) {
+  const drop    = document.getElementById(dropId);
+  const fileEl  = document.getElementById(fileId);
+  const preview = document.getElementById(previewId);
+  const wrap    = document.getElementById(wrapId);
+
+  fileEl.addEventListener('change', () => {
+    const f = fileEl.files[0];
+    if (f) mostrarPreview(f, preview, wrap, drop);
+  });
+
+  drop.addEventListener('dragover',  e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', e => { drop.classList.remove('over'); });
+  drop.addEventListener('drop', e => {
+    e.preventDefault();
+    drop.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    // Transferimos el archivo al input para que analizarX() lo lea
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    fileEl.files = dt.files;
+    mostrarPreview(f, preview, wrap, drop);
+  });
+}
+
+function mostrarPreview(file, imgEl, wrapEl, dropEl) {
+  // Validar tipo
+  if (!file.type.startsWith('image/')) {
+    alert('Solo se aceptan imágenes (JPG, PNG, WEBP).');
+    return;
+  }
+  // Validar tamaño
+  if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+    alert(`La imagen supera los ${MAX_SIZE_MB} MB. Reduce su tamaño antes de subirla.`);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgEl.src = e.target.result;
+    wrapEl.style.display = 'block';
+    dropEl.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function limpiarImagen(id) {
+  document.getElementById('file' + id).value = '';
+  document.getElementById('preview' + id).src = '';
+  document.getElementById('previewWrap' + id).style.display = 'none';
+  document.getElementById('drop' + id).style.display = 'block';
+  document.getElementById('result' + id).style.display = 'none';
+  hideError(id);
+}
+
+setupDrop('dropFruta',   'fileFruta',   'previewFruta',   'previewWrapFruta');
+setupDrop('dropTerreno', 'fileTerreno', 'previewTerreno', 'previewWrapTerreno');
+
+/* ═══════════════════════════════════════════════
+   ESTADO DE CARGA + TEMPORIZADOR
+═══════════════════════════════════════════════ */
+
+const timers = {};
+
+function setLoading(id, loading, progressMsg, porcentaje) {
+  const btn      = document.getElementById('btn' + id);
+  const spinner  = document.getElementById('spinner' + id);
+  const txt      = document.getElementById('txtBtn' + id);
+  const progCont = document.getElementById('progressCont' + id);
+  const progBar  = document.getElementById('progressBar' + id);
+  const progTxt  = document.getElementById('progress' + id);
+  const cancelBtn= document.getElementById('cancel' + id);
+  const timerEl  = document.getElementById('timer' + id);
+
+  btn.disabled = loading;
+  spinner.style.display = loading ? 'block' : 'none';
+  txt.textContent = loading ? 'Analizando...' : (id === 'Fruta' ? '⚡ Analizar Fruta' : '🔬 Analizar Terreno');
+  progCont.style.display = loading ? 'block' : 'none';
+  cancelBtn.style.display = loading ? 'block' : 'none';
+
+  if (loading) {
+    if (progressMsg) progTxt.textContent = progressMsg;
+    if (porcentaje !== undefined) progBar.style.width = porcentaje + '%';
+    // Iniciar cronómetro
+    if (!timers[id]) {
+      const start = Date.now();
+      timerEl.style.display = 'block';
+      timers[id] = setInterval(() => {
+        const s = ((Date.now() - start) / 1000).toFixed(1);
+        timerEl.textContent = `Tiempo transcurrido: ${s}s`;
+      }, 200);
+    }
+  } else {
+    progBar.style.width = '100%';
+    cancelBtn.style.display = 'none';
+    if (timers[id]) {
+      clearInterval(timers[id]);
+      timers[id] = null;
+    }
+    // Dejar el tiempo visible unos segundos
+    setTimeout(() => { timerEl.style.display = 'none'; }, 3000);
+  }
+}
+
+function cancelarAnalisis(id) {
+  if (abortControllers[id]) {
+    abortControllers[id].abort();
+    abortControllers[id] = null;
+  }
+  setLoading(id, false);
+  showError(id, 'Análisis cancelado por el usuario.');
+}
+
+function showError(id, msg) {
+  const el = document.getElementById('error' + id);
+  el.innerHTML = msg;
+  el.style.display = 'block';
+}
+function hideError(id) {
+  const el = document.getElementById('error' + id);
+  el.style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════════
+   CONOCIMIENTO TÉCNICO
+═══════════════════════════════════════════════ */
+
+const CONOCIMIENTO_BANANO = `Eres BananaCheck, un sistema experto de control de calidad agrícola especializado en banano (Musa acuminata) para Colombia. Respondes SIEMPRE en español, con terminología técnica precisa.
+
+=== ESCALA DE MADUREZ UNECE 1-7 ===
+1: Verde muy oscuro, completamente inmaduro
+2: Verde uniforme — ESTADO ÓPTIMO PARA EXPORTACIÓN INTERNACIONAL
+3: Verde con trazas amarillas (pintón incipiente)
+4: Mitad verde / mitad amarillo (pintón)
+5: Más amarillo que verde (pintón avanzado)
+6: Amarillo con trazas verdes en la punta (maduro)
+7: Amarillo uniforme, puede tener pecas (maduro pleno)
+
+=== CRITERIOS DE EXPORTACIÓN INTERNACIONAL (FAO/UNECE FFV-24 · AUGURA Colombia) ===
+APTO si CUMPLE TODOS:
+• Escala UNECE 1-2 (verde, sin trazas amarillas)
+• Longitud ≥ 14 cm (calibre mínimo)
+• Diámetro ≥ 27 mm
+• Sin manchas fungosas, cicatrices grandes ni rajaduras
+• Sin daño mecánico visible (golpes, magulladuras)
+• Forma curvada natural, sin angulaciones pronunciadas
+MOTIVO MÁS COMÚN DE RECHAZO: fruta en estado ≥ 3 (ya pintona o madura). Aunque esté sana, no se exporta internacionalmente porque debe madurar en tránsito.
+
+=== CRITERIOS MERCADO NACIONAL (Colombia) ===
+APTO si:
+• Cualquier etapa de madurez (1-7) siempre que no haya podredumbre activa
+• Sin enfermedades fúngicas avanzadas
+• Sin heridas abiertas o descomposición evidente
+• Golpes leves o manchas menores SÍ pueden aceptarse en mercado nacional
+
+=== ENFERMEDADES A IDENTIFICAR (síntomas visuales) ===
+• Sigatoka negra (Mycosphaerella fijiensis): rayas/manchas amarillo-pálidas → negras alargadas en cáscara
+• Antracnosis (Colletotrichum musae): manchas negras redondeadas hundidas con halos amarillos
+• Pudrición de corona: oscurecimiento y ablandamiento zona del pedúnculo (base del racimo)
+• Mal de Panamá (Fusarium oxysporum): amarillamiento asimétrico, fruta malformada o decoloración interna (no siempre visible externamente)
+• Punta de cigarro (Deightoniella torulosa): ennegrecimiento de la punta distal del dedo
+
+=== COLORES DE CÁSCARA ===
+Identifica el tono exacto: verde oscuro uniforme / verde medio / verde claro / verde-amarillo / amarillo con verde / amarillo uniforme / amarillo con pecas marrones. Menciona si hay manchas de otro color.
+
+Responde SIEMPRE en español. Da diagnósticos específicos y técnicos, no genéricos.`;
+
+const CONOCIMIENTO_TERRENO = `Eres BananaCheck-Suelo, un sistema experto en edafología y agronomía del cultivo de banano (Musa acuminata) en Colombia. Respondes SIEMPRE en español con terminología técnica precisa.
+
+=== PARÁMETROS IDEALES SUELO PARA BANANO (CENIBANANO / ICA Colombia) ===
+• Textura: franca, franco-arcillosa o franco-limosa (retiene humedad pero drena bien)
+• pH óptimo: 6.0 - 7.0
+• Materia orgánica: > 2%
+• Humedad visual: suelo oscuro pero no encharcado; cobertura vegetal uniforme
+• Profundidad efectiva: > 60 cm (raíces profundas)
+• Sin compactación superficial (costra dura)
+• Sin encharcamiento (banano es sensible a raíces anegadas > 48h)
+
+=== QUÉ OBSERVAR EN LA IMAGEN ===
+1. COLOR DEL SUELO: marrón oscuro (buena MO) vs marrón claro/gris (poca MO) vs rojo (laterítico) vs amarillento (erosión, lixiviación)
+2. HUMEDAD APARENTE: seco (suelo claro, agrietado) / húmedo adecuado (oscuro, cohesivo) / encharcado (agua visible, brillo superficial)
+3. COBERTURA VEGETAL: tipo, densidad, presencia de malezas agresivas (coquito, bermuda)
+4. EROSIÓN: cárcavas, surcos de escorrentía, suelo desnudo en pendiente
+5. COMPACTACIÓN: superficie dura, brillante, sin macroporos visibles, huellas marcadas
+6. RESIDUOS: presencia de paja, rastrojo, mulch (positivo) vs suelo desnudo (negativo)
+7. SIGNOS DE DEFICIENCIA: amarillamiento en plantas vecinas visibles, vegetación raquítica
+
+=== RECOMENDACIONES DE ABONO (orientativas) ===
+• Suelo claro / poca MO: aplicar compost o gallinaza (10-20 t/ha) + urea o sulfato de amonio
+• Suelo ácido aparente (vegetación indicadora de acidez): encalado con cal dolomítica
+• Encharcado: mejorar drenaje antes de sembrar; considerar camas elevadas
+• Seco/agrietado: riego por goteo o surcos; mulching para retener humedad
+
+Responde SIEMPRE en español. Sé técnico y específico.`;
+
+/* ═══════════════════════════════════════════════
+   CONVERSIÓN BASE64 CON RESIZE INTELIGENTE
+═══════════════════════════════════════════════ */
+
+async function fileToBase64Resized(file, maxPx = 1024) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      // Reducir si supera maxPx (ahorra RAM y acelera el modelo)
+      if (width > maxPx || height > maxPx) {
+        const ratio = Math.min(maxPx / width, maxPx / height);
+        width  = Math.round(width  * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      // JPEG al 85% — buen balance calidad/tamaño
+      const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      resolve(b64);
+    };
+    img.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
+    img.src = url;
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   LLAMADA A OLLAMA (con AbortController)
+═══════════════════════════════════════════════ */
+
+function getHeaders() {
+  const url = getOllamaUrl();
+  const headers = { 'Content-Type': 'application/json' };
+  if (url.includes('ngrok')) headers['ngrok-skip-browser-warning'] = '1';
+  return headers;
+}
+
+async function ollamaChat(messages, abortSignal) {
+  const url = getOllamaUrl() + '/api/chat';
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders(),
+    signal: abortSignal,
+    body: JSON.stringify({
+      model: getModelo(),
+      messages: messages,
+      stream: false,
+      options: {
+        temperature: 0.1,
+        num_predict: 300,   // mínimo suficiente para la tabla
+        num_ctx: 512,       // contexto muy reducido = menos RAM y mucho más rápido
+        top_p: 0.9,
+        top_k: 10,
+        repeat_penalty: 1.1
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    if (errText.includes('model') && errText.includes('not found')) {
+      throw new Error(`Modelo "${getModelo()}" no encontrado. Instálalo con: ollama pull ${getModelo()}`);
+    }
+    throw new Error(`Ollama respondió con error ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  if (!data.message?.content) throw new Error('Ollama devolvió una respuesta vacía.');
+  return data.message.content.trim();
+}
+
+/* ═══════════════════════════════════════════════
+   LIMPIEZA DE RESPUESTAS
+═══════════════════════════════════════════════ */
+
+function limpiarRespuesta(texto) {
+  let t = texto;
+  // Quitar frases de disculpa/rechazo en inglés y español
+  const patrones = [
+    /^.*?lo siento[^.]*\.\s*/is,
+    /^.*?no puedo (proporcionar|ayudarte|dar|hacer)[^.]*\.\s*/is,
+    /^.*?i('m| am) sorry[^.]*\.\s*/is,
+    /^.*?i (cannot|can't|am unable)[^.]*\.\s*/is,
+    /^.*?as an? (ai|language model)[^.]*\.\s*/is,
+    /^.*?sin embargo[^:]*:?\s*/is,
+  ];
+  for (const p of patrones) t = t.replace(p, '');
+
+  // Quitar disclaimers finales
+  t = t.replace(/\n*(espero que esto (sea|ayude|te sea)[^]*$)/is, '');
+  t = t.replace(/\n*(si (tienes|tiene) alguna[^]*$)/is, '');
+  t = t.replace(/\n*(note:[^]*$)/is, '');
+  t = t.replace(/\n*(nota:[^]*$)/is, '');
+
+  return t.trim() || texto.trim();
+}
+
+/* ═══════════════════════════════════════════════
+   DETECCIÓN DE COLOR DE CÁSCARA
+═══════════════════════════════════════════════ */
+
+function detectarColorCascara(texto) {
+  const t = texto.toLowerCase();
+  if (t.includes('verde oscuro') || t.includes('dark green'))  return { label: 'Verde oscuro',   hex: '#1a5c2a', unece: 1 };
+  if (t.includes('verde uniforme') || t.includes('verde medio')) return { label: 'Verde uniforme', hex: '#2d8a4e', unece: 2 };
+  if (t.includes('verde claro') || t.includes('light green'))  return { label: 'Verde claro',    hex: '#4caf50', unece: 2 };
+  if ((t.includes('verde') && t.includes('amarill')) || t.includes('pintón') || t.includes('pinton')) {
+    return { label: 'Verde-amarillo (pintón)', hex: '#8bc34a', unece: 3 };
+  }
+  if (t.includes('amarillo') && t.includes('verde'))           return { label: 'Amarillo-verde', hex: '#cddc39', unece: 4 };
+  if (t.includes('amarillo') && (t.includes('peca') || t.includes('mancha'))) {
+    return { label: 'Amarillo con pecas',      hex: '#ffc107', unece: 7 };
+  }
+  if (t.includes('amarillo uniforme') || t.includes('fully yellow') || t.includes('completamente amarillo')) {
+    return { label: 'Amarillo uniforme',       hex: '#ffeb3b', unece: 6 };
+  }
+  if (t.includes('amarillo'))                                  return { label: 'Amarillo',       hex: '#ffe082', unece: 5 };
+  if (t.includes('negro') || t.includes('black'))             return { label: 'Negro/marrón',   hex: '#4e342e', unece: 7 };
+  return null;
+}
+
+/* ═══════════════════════════════════════════════
+   DETECCIÓN DE EXPORTACIÓN (mejorada)
+═══════════════════════════════════════════════ */
+
+function interpretarSiNo(fragmento) {
+  if (!fragmento) return 'dudoso';
+  const f = fragmento.toLowerCase().trim();
+
+  // Negativos compuestos primero
+  const negativos = ['no adecuado','no apto','no es apto','no cumple','no está apto',
+    'no esta apto','no aceptable','rechazado','inadecuado','no recomendado',
+    'no califica','no aplica','no procede'];
+  for (const n of negativos) {
+    if (f.includes(n)) return 'no';
+  }
+  if (/^no[\s,.]/.test(f) || f === 'no') return 'no';
+
+  const positivos = ['sí','si,','aceptado','apto','cumple','aceptable','recomendado',
+    'adecuado','califica','procede'];
+  for (const p of positivos) {
+    if (f.startsWith(p)) return 'si';
+  }
+  if (/^sí?\b/.test(f)) return 'si';
+
+  return 'dudoso';
+}
+
+function detectarExportacion(texto) {
+  const lower = texto.toLowerCase();
+
+  function buscar(etiquetaRegex) {
+    const patron = new RegExp(etiquetaRegex + '[^|\\n]*\\|\\s*([^|\\n]+)', 'i');
+    const m = lower.match(patron);
+    if (m) return interpretarSiNo(m[1].trim());
+
+    // Fallback: buscar por línea normal
+    const patron2 = new RegExp(etiquetaRegex + '[\\s\\(sí/no\\):·\\-]*', 'i');
+    const m2 = lower.match(patron2);
+    if (!m2) return null;
+    const idx = m2.index + m2[0].length;
+    const linea = lower.slice(idx, idx + 200).split(/[\n\r]/)[0].trim();
+    return interpretarSiNo(linea);
+  }
+
+  const nacional      = buscar('apto exportaci[oó]n nacional')
+                     || buscar('exportaci[oó]n nacional');
+  const internacional = buscar('apto exportaci[oó]n internacional')
+                     || buscar('exportaci[oó]n internacional');
+
+  return { nacional, internacional };
+}
+
+/* ═══════════════════════════════════════════════
+   TABLA MARKDOWN → HTML
+═══════════════════════════════════════════════ */
+
+function tablaMarkdownAHtml(texto) {
+  const lineas = texto.split('\n').filter(l => l.trim().startsWith('|'));
+  if (lineas.length < 2) return null;
+
+  const filas = [];
+  for (const linea of lineas) {
+    const celdas = linea.split('|').map(c => c.trim()).filter(c => c);
+    if (celdas.every(c => /^[-:]+$/.test(c))) continue; // separador
+    if (celdas.length >= 1) filas.push(celdas);
+  }
+  if (filas.length === 0) return null;
+
+  // Saltar fila de encabezado genérico (Campo / Descripción)
+  const inicio = (filas[0][0]?.toLowerCase().match(/campo|parámetro|item/)) ? 1 : 0;
+
+  let html = '<table class="ficha-tabla">';
+  for (let i = inicio; i < filas.length; i++) {
+    html += `<tr><td>${filas[i][0] || ''}</td><td>${filas[i][1] || ''}</td></tr>`;
+  }
+  html += '</table>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════
+   FICHA TÉCNICA → HTML ENRIQUECIDO
+═══════════════════════════════════════════════ */
+
+function madurezBarHtml(unece) {
+  if (!unece) return '';
+  let cls = 'verde-seg';
+  if (unece >= 3 && unece <= 5) cls = 'pinton-seg';
+  if (unece >= 6) cls = 'maduro-seg';
+  let segs = '';
+  for (let i = 1; i <= 7; i++) {
+    segs += `<div class="madurez-seg ${i <= unece ? 'act ' + cls : ''}"></div>`;
+  }
+  return `<div style="margin-bottom:0.2rem;font-size:0.72rem;color:var(--gris);">Escala UNECE: ${unece}/7</div>
+          <div class="madurez-bar">${segs}</div>`;
+}
+
+function colorChipHtml(colorInfo) {
+  if (!colorInfo) return '';
+  return `<span class="color-chip">
+    <span class="color-dot" style="background:${colorInfo.hex}"></span>
+    ${colorInfo.label}
+  </span>`;
+}
+
+function tarjetaExportacionHtml(valor, titulo) {
+  if (!valor) return '';
+  const clase = valor === 'si' ? 'si' : valor === 'no' ? 'no' : 'dudoso';
+  const texto = valor === 'si' ? '✅ Apto' : valor === 'no' ? '❌ No apto' : '⚠️ No concluyente';
+  return `<div class="export-card ${clase}">
+    <div class="export-titulo">${titulo}</div>
+    <div class="export-valor">${texto}</div>
+  </div>`;
+}
+
+function formatearFichaFruta(textoOriginal) {
+  const limpio = limpiarRespuesta(textoOriginal);
+  const exportInfo  = detectarExportacion(limpio);
+  const colorInfo   = detectarColorCascara(limpio);
+  const tablaHtml   = tablaMarkdownAHtml(limpio);
+
+  let html = '';
+
+  // Tarjetas exportación
+  if (exportInfo.nacional || exportInfo.internacional) {
+    html += '<div class="export-cards">';
+    html += tarjetaExportacionHtml(exportInfo.nacional,      'Exportación Nacional');
+    html += tarjetaExportacionHtml(exportInfo.internacional, 'Exportación Internacional');
+    html += '</div>';
+  }
+
+  // Chip de color + barra UNECE
+  if (colorInfo) {
+    html += `<div style="margin-bottom:0.7rem;">${colorChipHtml(colorInfo)}${madurezBarHtml(colorInfo.unece)}</div>`;
+  }
+
+  // Tabla o texto plano
+  html += tablaHtml
+    ? tablaHtml
+    : `<div style="white-space:pre-wrap;">${limpio}</div>`;
+
+  return html;
+}
+
+function formatearFichaTerreno(textoOriginal) {
+  const limpio   = limpiarRespuesta(textoOriginal);
+  const tablaHtml = tablaMarkdownAHtml(limpio);
+  return tablaHtml
+    ? tablaHtml
+    : `<div style="white-space:pre-wrap;">${limpio}</div>`;
+}
+
+/* ═══════════════════════════════════════════════
+   ANÁLISIS DE FRUTA (4 pasos optimizados)
+═══════════════════════════════════════════════ */
+
+async function analizarFruta() {
+  hideError('Fruta');
+  const file = document.getElementById('fileFruta').files[0];
+  if (!file) { showError('Fruta', '📷 Selecciona o arrastra una imagen del banano primero.'); return; }
+
+  // Nuevo AbortController para este análisis
+  const ac = new AbortController();
+  abortControllers['Fruta'] = ac;
+
+  setLoading('Fruta', true, 'Analizando imagen...', 10);
+  try {
+    const b64 = await fileToBase64Resized(file, 512);
+
+    // UN SOLO PASO — más rápido con 6GB RAM
+    setLoading('Fruta', true, 'Procesando con IA...', 40);
+    const historial = [
+      { role: 'system', content: 'Eres un experto en calidad de banano. Respondes SIEMPRE en español. Escala UNECE: 1-2=verde(exportación internacional), 3-4=pintón, 5-7=maduro. Apto exportación internacional: solo UNECE 1-2, sin manchas ni golpes. Apto nacional: cualquier etapa sin podredumbre.' },
+      {
+        role: 'user',
+        content: `Analiza esta imagen de banano y responde SOLO en español con esta tabla Markdown:
+
+| Campo | Valor |
+|-------|-------|
+| Color de la cáscara | |
+| Etapa UNECE (1-7) | |
+| Textura visible | |
+| Manchas oscuras | |
+| Golpes o deformaciones | |
+| Signos de enfermedad | |
+| Apto exportación nacional (sí/no) | |
+| Apto exportación internacional (sí/no) | |
+| Diagnóstico breve | |
+
+Responde SOLO la tabla, sin texto adicional.`,
+        images: [b64]
+      }
+    ];
+    const r3 = await ollamaChat(historial, ac.signal);
+
+    setLoading('Fruta', false);
+
+    const resultBox = document.getElementById('resultFruta');
+    resultBox.innerHTML = `
+      <div class="result-header ok">📋 Ficha técnica — Fruta</div>
+      <div class="result-body">${formatearFichaFruta(r3)}</div>`;
+    resultBox.style.display = 'block';
+    resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Guardar en CSV
+    guardarEnCSV('fruta', r3);
+
+  } catch (e) {
+    setLoading('Fruta', false);
+    if (e.name === 'AbortError') return; // cancelado por el usuario
+    const msg = e.message || 'Error desconocido';
+    showError('Fruta',
+      `❌ <strong>Error:</strong> ${msg}<br>
+       <small>Verifica que Ollama esté corriendo con <code>OLLAMA_ORIGINS=* ollama serve</code> y que el modelo <code>${getModelo()}</code> esté instalado.</small>`);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   ANÁLISIS DE TERRENO (4 pasos optimizados)
+═══════════════════════════════════════════════ */
+
+async function analizarTerreno() {
+  hideError('Terreno');
+  const file = document.getElementById('fileTerreno').files[0];
+  if (!file) { showError('Terreno', '🌍 Selecciona o arrastra una imagen del terreno primero.'); return; }
+
+  const ac = new AbortController();
+  abortControllers['Terreno'] = ac;
+
+  setLoading('Terreno', true, 'Analizando imagen...', 10);
+  try {
+    const b64 = await fileToBase64Resized(file, 512);
+
+    // UN SOLO PASO — más rápido con 6GB RAM
+    setLoading('Terreno', true, 'Procesando con IA...', 40);
+    const historial = [
+      { role: 'system', content: 'Eres un experto en suelos agrícolas para cultivo de banano. Respondes SIEMPRE en español. Suelo ideal: color marrón oscuro, húmedo pero no encharcado, sin erosión ni compactación.' },
+      {
+        role: 'user',
+        content: `Analiza esta imagen de terreno y responde SOLO en español con esta tabla Markdown:
+
+| Campo | Valor |
+|-------|-------|
+| Color del suelo | |
+| Humedad aparente | |
+| Cobertura vegetal | |
+| Signos de erosión | |
+| Compactación visible | |
+| Materia orgánica estimada | |
+| Apto para siembra de banano | |
+| Problemas detectados | |
+| Recomendación principal | |
+
+Responde SOLO la tabla, sin texto adicional.`,
+        images: [b64]
+      }
+    ];
+    const r3 = await ollamaChat(historial, ac.signal);
+
+    setLoading('Terreno', false);
+
+    const resultBox = document.getElementById('resultTerreno');
+    resultBox.innerHTML = `
+      <div class="result-header ok">📋 Ficha técnica — Terreno</div>
+      <div class="result-body">${formatearFichaTerreno(r3)}</div>`;
+    resultBox.style.display = 'block';
+    resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Guardar en CSV
+    guardarEnCSV('terreno', r3);
+
+  } catch (e) {
+    setLoading('Terreno', false);
+    if (e.name === 'AbortError') return;
+    const msg = e.message || 'Error desconocido';
+    showError('Terreno',
+      `❌ <strong>Error:</strong> ${msg}<br>
+       <small>Verifica que Ollama esté corriendo con <code>OLLAMA_ORIGINS=* ollama serve</code> y que el modelo <code>${getModelo()}</code> esté instalado.</small>`);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   GUARDAR EN CSV (vía servidor Python)
+═══════════════════════════════════════════════ */
+
+function extraerValorTabla(texto, campo) {
+  const lower = texto.toLowerCase();
+  const campoLower = campo.toLowerCase();
+  const regex = new RegExp(campoLower + '[^|\\n]*\\|\\s*([^|\\n]+)', 'i');
+  const m = lower.match(regex);
+  return m ? m[1].trim() : '';
+}
+
+async function guardarEnCSV(tipo, textoRespuesta) {
+  try {
+    let datos = {};
+    if (tipo === 'fruta') {
+      datos = {
+        color_cascara:         extraerValorTabla(textoRespuesta, 'color de la c'),
+        etapa_unece:           extraerValorTabla(textoRespuesta, 'etapa unece'),
+        textura:               extraerValorTabla(textoRespuesta, 'textura'),
+        manchas_oscuras:       extraerValorTabla(textoRespuesta, 'manchas oscuras'),
+        golpes_deformaciones:  extraerValorTabla(textoRespuesta, 'golpes'),
+        signos_enfermedad:     extraerValorTabla(textoRespuesta, 'signos de enfermedad'),
+        apto_nacional:         extraerValorTabla(textoRespuesta, 'exportaci'),
+        apto_internacional:    extraerValorTabla(textoRespuesta, 'internacional'),
+        diagnostico:           extraerValorTabla(textoRespuesta, 'diagn')
+      };
+    } else {
+      datos = {
+        color_suelo:       extraerValorTabla(textoRespuesta, 'color del suelo'),
+        humedad:           extraerValorTabla(textoRespuesta, 'humedad'),
+        cobertura_vegetal: extraerValorTabla(textoRespuesta, 'cobertura'),
+        erosion:           extraerValorTabla(textoRespuesta, 'erosi'),
+        compactacion:      extraerValorTabla(textoRespuesta, 'compactaci'),
+        materia_organica:  extraerValorTabla(textoRespuesta, 'materia org'),
+        apto_siembra:      extraerValorTabla(textoRespuesta, 'apto para siembra'),
+        problemas:         extraerValorTabla(textoRespuesta, 'problemas'),
+        recomendacion:     extraerValorTabla(textoRespuesta, 'recomendaci')
+      };
+    }
+
+    const res = await fetch(`http://127.0.0.1:${PUERTO_SERVIDOR}/guardar/${tipo}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      console.log(`✅ Guardado en CSV — ${tipo} — total: ${json.total}`);
+    }
+  } catch (e) {
+    console.warn('No se pudo guardar en CSV:', e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+const PUERTO_SERVIDOR = 9090;
+
+window.addEventListener('load', () => {
+  autoDetectarOllama();
+  detectarIpLocal();
+});
+</script>
+</body>
+</html>
