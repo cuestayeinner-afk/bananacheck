@@ -9,7 +9,15 @@ import json
 import os
 import pandas as pd
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+
+# Importar YOLOv8 (opcional)
+try:
+    from yolo_inference import inicializar as init_yolo, detector
+    YOLO_DISPONIBLE = True
+except ImportError:
+    YOLO_DISPONIBLE = False
+    print("⚠️  yolo_inference no disponible — análisis sin YOLOv8")
 
 # ── Configuración ──
 PUERTO      = 9090
@@ -94,6 +102,8 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             self._guardar("/guardar/terreno", guardar_terreno, "terreno")
         elif ruta == "/stats":
             self._stats()
+        elif ruta == "/yolo/detectar":
+            self._yolo_detectar()
         else:
             self.send_response(404)
             self.end_headers()
@@ -148,6 +158,72 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
+    def _yolo_detectar(self):
+        """Endpoint para detección YOLOv8 de bananos."""
+        if not YOLO_DISPONIBLE:
+            self.send_response(503)
+            self._headers_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "ok": False,
+                "error": "YOLOv8 no disponible",
+                "banano_detectado": False
+            }).encode())
+            return
+
+        try:
+            # Leer imagen multipart
+            content_type = self.headers.get("Content-Type", "")
+            if "multipart/form-data" in content_type:
+                # Parsear multipart
+                import cgi
+                form = cgi.FieldStorage(
+                    fp=self.rfile,
+                    headers=self.headers,
+                    environ={
+                        'REQUEST_METHOD': 'POST',
+                        'CONTENT_TYPE': content_type,
+                    }
+                )
+                if "imagen" not in form:
+                    raise ValueError("Campo 'imagen' no encontrado")
+                fileitem = form["imagen"]
+                image_data = fileitem.file.read()
+            else:
+                # Raw bytes
+                length = int(self.headers.get("Content-Length", 0))
+                image_data = self.rfile.read(length)
+
+            if not image_data:
+                raise ValueError("Imagen vacía")
+
+            # Detección
+            det = init_yolo() if YOLO_DISPONIBLE else None
+            if det is None:
+                raise RuntimeError("Detector no inicializado")
+            
+            resultado = det.detectar_bananos(image_data, conf_threshold=0.5)
+
+            self.send_response(200)
+            self._headers_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(resultado).encode())
+            print(f"🎯 YOLOv8: {resultado}")
+
+        except Exception as e:
+            self.send_response(500)
+            self._headers_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "ok": False,
+                "error": str(e),
+                "banano_detectado": False
+            }).encode())
+            print(f"❌ Error YOLOv8: {e}")
+
     def _headers_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -155,6 +231,12 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     inicializar_csv()
+    if YOLO_DISPONIBLE:
+        try:
+            init_yolo()
+            print("✅ YOLOv8 inicializado")
+        except Exception as e:
+            print(f"⚠️  Error inicializando YOLOv8: {e}")
     server = http.server.HTTPServer(("0.0.0.0", PUERTO), BananaCheckHandler)
     print(f"""
 ╔══════════════════════════════════════╗

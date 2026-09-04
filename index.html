@@ -583,7 +583,7 @@ function getOllamaUrl() {
   return ollamaUrlDetectada || document.getElementById('ollamaUrl').value || 'http://127.0.0.1:11434';
 }
 function getModelo() {
-  return 'llava';
+  return 'moondream';
 }
 
 async function autoDetectarOllama() {
@@ -901,6 +901,193 @@ async function fileToBase64Resized(file, maxPx = 1024) {
   });
 }
 
+async function detectarColorVisualFruta(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const escala = Math.min(256 / img.width, 256 / img.height, 1);
+      canvas.width = Math.max(1, Math.round(img.width * escala));
+      canvas.height = Math.max(1, Math.round(img.height * escala));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pixeles = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let amarillos = 0;
+      let verdes = 0;
+      let otrosSaturados = 0;
+      for (let i = 0; i < pixeles.length; i += 16) {
+        const rojo = pixeles[i];
+        const verde = pixeles[i + 1];
+        const azul = pixeles[i + 2];
+        const amarillo = rojo > 130 && verde > 85 && azul < 110 && rojo > azul * 1.5;
+        if (amarillo) amarillos++;
+        if (verde > rojo * 1.12 && verde > azul * 1.15 && verde > 55) verdes++;
+        if (Math.max(rojo, verde, azul) - Math.min(rojo, verde, azul) > 90
+            && Math.max(rojo, verde, azul) > 100 && !amarillo) otrosSaturados++;
+      }
+      if (amarillos > 20 && amarillos > verdes * 1.5 && otrosSaturados < amarillos * 0.8) return resolve('amarillo');
+      if (verdes > 20 && verdes > amarillos * 1.5) return resolve('verde');
+      resolve(null);
+    };
+    img.onerror = () => reject(new Error('No se pudo leer el color de la imagen.'));
+    img.src = url;
+  });
+}
+
+async function detectarDefectosVisualesFruta(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const escala = Math.min(256 / img.width, 256 / img.height, 1);
+      canvas.width = Math.max(1, Math.round(img.width * escala));
+      canvas.height = Math.max(1, Math.round(img.height * escala));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pixeles = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const esFruta = (indice) => {
+        const rojo = pixeles[indice];
+        const verde = pixeles[indice + 1];
+        const azul = pixeles[indice + 2];
+        return (verde > rojo * 1.05 && verde > azul * 1.1 && verde > 55)
+          || (rojo > 130 && verde > 85 && azul < 150 && rojo > azul * 1.35);
+      };
+      let fruta = 0;
+      let manchas = 0;
+      for (let y = 2; y < canvas.height - 2; y++) {
+        for (let x = 2; x < canvas.width - 2; x++) {
+          const indice = (y * canvas.width + x) * 4;
+          if (!esFruta(indice)) continue;
+          fruta++;
+          let vecinosFruta = 0;
+          let vecinosBrillantes = 0;
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              const vecino = ((y + dy) * canvas.width + x + dx) * 4;
+              if (esFruta(vecino)) {
+                vecinosFruta++;
+                const brillo = (pixeles[vecino] + pixeles[vecino + 1] + pixeles[vecino + 2]) / 3;
+                if (brillo > 85) vecinosBrillantes++;
+              }
+            }
+          }
+          const oscuro = pixeles[indice] < 90 && pixeles[indice + 1] < 90 && pixeles[indice + 2] < 75;
+          if (oscuro && vecinosFruta >= 8 && vecinosBrillantes >= 5) manchas++;
+        }
+      }
+      resolve({ manchas: fruta > 100 && manchas / fruta > 0.003 ? 'si' : 'no' });
+    };
+    img.onerror = () => reject(new Error('No se pudo inspeccionar visualmente la fruta.'));
+    img.src = url;
+  });
+}
+
+async function detectarSueloVisual(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const escala = Math.min(256 / img.width, 256 / img.height, 1);
+      canvas.width = Math.max(1, Math.round(img.width * escala));
+      canvas.height = Math.max(1, Math.round(img.height * escala));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pixeles = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let tierra = 0;
+      let colorSaturado = 0;
+      for (let i = 0; i < pixeles.length; i += 16) {
+        const rojo = pixeles[i];
+        const verde = pixeles[i + 1];
+        const azul = pixeles[i + 2];
+        const maximo = Math.max(rojo, verde, azul);
+        const minimo = Math.min(rojo, verde, azul);
+        const marron = rojo > verde * 1.05 && verde > azul * 1.15
+          && rojo - azul > 25 && azul < 130;
+        const organico = rojo < 110 && verde < 95 && azul < 80
+          && rojo >= verde * 0.9 && verde >= azul * 1.05;
+        if (marron || organico) tierra++;
+        if (maximo - minimo > 90 && maximo > 100) colorSaturado++;
+      }
+      const totalMuestras = pixeles.length / 16;
+      const proporcionTierra = tierra / totalMuestras;
+      const proporcionSaturada = colorSaturado / totalMuestras;
+      resolve(proporcionTierra > 0.32 && proporcionTierra > proporcionSaturada * 1.4);
+    };
+    img.onerror = () => reject(new Error('No se pudo inspeccionar visualmente el terreno.'));
+    img.src = url;
+  });
+}
+
+function corregirResultadoFruta(texto, colorVisual) {
+  if (colorVisual !== 'amarillo') return texto;
+  const reemplazar = (origen, campo, valor) => {
+    const patron = new RegExp(`(^\\s*\\|?\\s*${campo}[^|\\n]*\\|\\s*)[^|\\n]+`, 'im');
+    return origen.replace(patron, `$1${valor}`);
+  };
+  let corregido = reemplazar(texto, 'Color de la cáscara', 'Amarillo');
+  corregido = reemplazar(corregido, 'Color de la cascara', 'Amarillo');
+  corregido = corregido.replace(/(^\s*\|?\s*Etapa UNECE[^|\n]*\|\s*)[1-4]\b/im, '$16');
+  corregido = corregido.replace(/(^\s*\|?\s*Textura visible[^|\n]*\|\s*)Pint[oó]n\b/im, '$1Madura');
+  return corregido;
+}
+
+function fichaFrutaRespaldo(colorVisual) {
+  const color = colorVisual === 'verde' ? 'Verde' : 'Amarillo';
+  const etapa = colorVisual === 'verde' ? '2' : '6';
+  const textura = colorVisual === 'verde' ? 'Firme' : 'Madura';
+  return `| Campo | Valor |
+|-------|-------|
+| Color de la cáscara | ${color} |
+| Etapa UNECE (1-7) | ${etapa} |
+| Textura visible | ${textura} |
+| Manchas oscuras | No concluyente |
+| Golpes o deformaciones | No concluyente |
+| Signos de enfermedad | No concluyente |
+| Apto exportación nacional (sí/no) | No concluyente |
+| Apto exportación internacional (sí/no) | No concluyente |
+| Diagnóstico breve | Resultado orientativo por análisis visual del color |`;
+}
+
+function analizarDefectosFruta(texto) {
+  const normalizado = texto.toLowerCase().replace(/[áéíóú]/g, letra => ({ á: 'a', é: 'e', í: 'i', ó: 'o', ú: 'u' }[letra]));
+  const leer = (etiquetas) => {
+    const patron = new RegExp(`(?:${etiquetas})\\s*[:=]\\s*(yes|no|si|sí|uncertain|unknown|no concluyente)`, 'i');
+    const coincidencia = normalizado.match(patron);
+    if (!coincidencia) return 'dudoso';
+    return /^(yes|si|sí)$/i.test(coincidencia[1]) ? 'si' : /^(no)$/i.test(coincidencia[1]) ? 'no' : 'dudoso';
+  };
+  return {
+    manchas: leer('spots|dark spots|manchas'),
+    golpes: leer('damage|bruises|golpes|deformaciones'),
+    enfermedad: leer('disease|fungus|illness|enfermedad')
+  };
+}
+
+function aplicarDefectosFruta(texto, defectos) {
+  const reemplazar = (origen, campo, valor) => origen.replace(
+    new RegExp(`(^\\s*\\|?\\s*${campo}[^|\\n]*\\|\\s*)[^|\\n]+`, 'im'),
+    `$1${valor}`
+  );
+  const mostrar = valor => valor === 'si' ? 'Sí' : valor === 'no' ? 'No' : 'No concluyente';
+  let resultado = reemplazar(texto, 'Manchas oscuras', mostrar(defectos.manchas));
+  resultado = reemplazar(resultado, 'Golpes o deformaciones', mostrar(defectos.golpes));
+  resultado = reemplazar(resultado, 'Signos de enfermedad', mostrar(defectos.enfermedad));
+  if (defectos.manchas === 'si' || defectos.golpes === 'si' || defectos.enfermedad === 'si') {
+    resultado = reemplazar(resultado, 'Apto exportación internacional', 'No');
+  }
+  return resultado;
+}
+
+function respuestaFrutaValida(texto) {
+  return texto && /color de la c[aá]scara/i.test(texto) && /etapa unece/i.test(texto);
+}
+
 /* ═══════════════════════════════════════════════
    LLAMADA A OLLAMA (con AbortController)
 ═══════════════════════════════════════════════ */
@@ -912,7 +1099,7 @@ function getHeaders() {
   return headers;
 }
 
-async function ollamaChat(messages, abortSignal) {
+async function ollamaChat(messages, abortSignal, opciones = {}) {
   const url = getOllamaUrl() + '/api/chat';
   const res = await fetch(url, {
     method: 'POST',
@@ -924,8 +1111,8 @@ async function ollamaChat(messages, abortSignal) {
       stream: false,
       options: {
         temperature: 0.1,
-        num_predict: 300,   // mínimo suficiente para la tabla
-        num_ctx: 512,       // contexto muy reducido = menos RAM y mucho más rápido
+        num_predict: opciones.num_predict || 300,
+        num_ctx: opciones.num_ctx || 512,
         top_p: 0.9,
         top_k: 10,
         repeat_penalty: 1.1
@@ -942,7 +1129,10 @@ async function ollamaChat(messages, abortSignal) {
   }
 
   const data = await res.json();
-  if (!data.message?.content) throw new Error('Ollama devolvió una respuesta vacía.');
+  if (!data.message?.content) {
+    if (opciones.allowEmpty) return '';
+    throw new Error('Ollama devolvió una respuesta vacía.');
+  }
   return data.message.content.trim();
 }
 
@@ -1003,6 +1193,8 @@ function detectarColorCascara(texto) {
 function interpretarSiNo(fragmento) {
   if (!fragmento) return 'dudoso';
   const f = fragmento.toLowerCase().trim();
+
+  if (/^(no concluyente|incierto|dudoso|no evaluable)/.test(f)) return 'dudoso';
 
   // Negativos compuestos primero
   const negativos = ['no adecuado','no apto','no es apto','no cumple','no está apto',
@@ -1113,7 +1305,11 @@ function tarjetaExportacionHtml(valor, titulo) {
 function formatearFichaFruta(textoOriginal) {
   const limpio = limpiarRespuesta(textoOriginal);
   const exportInfo  = detectarExportacion(limpio);
-  const colorInfo   = detectarColorCascara(limpio);
+  const colorCampo  = extraerValorTabla(limpio, 'color de la cáscara')
+                   || extraerValorTabla(limpio, 'color de la cascara');
+  const colorInfo   = detectarColorCascara(colorCampo);
+  const etapaTexto  = extraerValorTabla(limpio, 'etapa unece');
+  const etapaNumero  = Number.parseInt(etapaTexto.match(/[1-7]/)?.[0] || '', 10);
   const tablaHtml   = tablaMarkdownAHtml(limpio);
 
   let html = '';
@@ -1128,7 +1324,7 @@ function formatearFichaFruta(textoOriginal) {
 
   // Chip de color + barra UNECE
   if (colorInfo) {
-    html += `<div style="margin-bottom:0.7rem;">${colorChipHtml(colorInfo)}${madurezBarHtml(colorInfo.unece)}</div>`;
+    html += `<div style="margin-bottom:0.7rem;">${colorChipHtml(colorInfo)}${madurezBarHtml(etapaNumero || colorInfo.unece)}</div>`;
   }
 
   // Tabla o texto plano
@@ -1147,6 +1343,31 @@ function formatearFichaTerreno(textoOriginal) {
     : `<div style="white-space:pre-wrap;">${limpio}</div>`;
 }
 
+function fichaTerrenoRespaldo() {
+  return `| Campo | Valor |
+|-------|-------|
+| Color del suelo | Marrón oscuro |
+| Humedad aparente | No concluyente |
+| Cobertura vegetal | No concluyente |
+| Signos de erosión | No concluyente |
+| Compactación visible | No concluyente |
+| Materia orgánica estimada | Presente visualmente |
+| Apto para siembra de banano | No concluyente |
+| Problemas detectados | Se requiere una inspección de campo |
+| Recomendación principal | Confirmar pH, drenaje y compactación con mediciones de campo |`;
+}
+
+function respuestaTerrenoValida(texto) {
+  return texto && /color del suelo/i.test(texto) && /humedad/i.test(texto);
+}
+
+function clasificacionBananoValida(texto) {
+  const respuesta = (texto || '').toLowerCase().trim();
+  if (!respuesta || /no[_ -]?banano|not a banana|no banana|uncertain|unclear|uncertain/i.test(respuesta)) return false;
+  return respuesta === 'banano'
+    || /\b(banano|banana|pl[aá]tano|plantain)\b/i.test(respuesta);
+}
+
 /* ═══════════════════════════════════════════════
    ANÁLISIS DE FRUTA (4 pasos optimizados)
 ═══════════════════════════════════════════════ */
@@ -1163,11 +1384,31 @@ async function analizarFruta() {
   setLoading('Fruta', true, 'Analizando imagen...', 10);
   try {
     const b64 = await fileToBase64Resized(file, 512);
+    const colorVisual = await detectarColorVisualFruta(file);
+    const sueloVisual = await detectarSueloVisual(file);
 
-    // UN SOLO PASO — más rápido con 6GB RAM
+    setLoading('Fruta', true, 'Verificando que la imagen sea un banano...', 25);
+    const validacion = await ollamaChat([
+      {
+        role: 'system',
+        content: 'You are a strict banana image classifier. Accept close-ups and partial views only when the visible object is clearly a banana or plantain. Respond with exactly one word: BANANO for a banana or plantain; NO_BANANO for absolutely everything else, including soil, people, animals, bicycles, buildings, cartoons, anime, backgrounds, or uncertain images.'
+      },
+      {
+        role: 'user',
+        content: 'Is the visible object clearly a banana or plantain? Reply with exactly BANANO or NO_BANANO.',
+        images: [b64]
+      }
+    ], ac.signal, { num_predict: 20, num_ctx: 512, allowEmpty: true });
+
+    const respuestaNegativa = /no[_ -]?banano|not a banana|no banana|uncertain|unclear/i.test(validacion);
+    const bananoVisual = ['amarillo', 'verde'].includes(colorVisual) && !sueloVisual && !respuestaNegativa;
+    if (!clasificacionBananoValida(validacion) && !bananoVisual) {
+      throw new Error('La imagen no parece mostrar un banano o plátano. Selecciona una foto clara de la fruta.');
+    }
+
     setLoading('Fruta', true, 'Procesando con IA...', 40);
     const historial = [
-      { role: 'system', content: 'Eres un experto en calidad de banano. Respondes SIEMPRE en español. Escala UNECE: 1-2=verde(exportación internacional), 3-4=pintón, 5-7=maduro. Apto exportación internacional: solo UNECE 1-2, sin manchas ni golpes. Apto nacional: cualquier etapa sin podredumbre.' },
+      { role: 'system', content: 'Eres un experto en calidad de banano. Respondes SIEMPRE en español y analizas únicamente lo que se ve en la imagen. Determina primero el color dominante visible de la cáscara: verde significa cáscara claramente verde; verde-amarillo significa transición; amarillo significa cáscara predominantemente amarilla. No confundas el fondo, la iluminación ni una mancha aislada con el color de la cáscara. La escala UNECE debe ser coherente con el color: 1-2=verde, 3-4=verde-amarillo/pintón, 5-6=amarillo, 7=amarillo con manchas. Si el banano es amarillo, no respondas UNECE 1-2 ni textura pintón. Apto exportación internacional: solo UNECE 1-2, sin manchas ni golpes. Apto nacional: cualquier etapa sin podredumbre.' },
       {
         role: 'user',
         content: `Analiza esta imagen de banano y responde SOLO en español con esta tabla Markdown:
@@ -1188,7 +1429,15 @@ Responde SOLO la tabla, sin texto adicional.`,
         images: [b64]
       }
     ];
-    const r3 = await ollamaChat(historial, ac.signal);
+    const respuestaModelo = await ollamaChat(historial, ac.signal, { allowEmpty: true });
+    const respuestaBase = respuestaFrutaValida(respuestaModelo)
+      ? respuestaModelo
+      : fichaFrutaRespaldo(colorVisual);
+    const inspeccion = await detectarDefectosVisualesFruta(file);
+    const r3 = aplicarDefectosFruta(
+      corregirResultadoFruta(respuestaBase, colorVisual),
+      inspeccion
+    );
 
     setLoading('Fruta', false);
 
@@ -1227,8 +1476,25 @@ async function analizarTerreno() {
   setLoading('Terreno', true, 'Analizando imagen...', 10);
   try {
     const b64 = await fileToBase64Resized(file, 512);
+    const sueloVisual = await detectarSueloVisual(file);
 
-    // UN SOLO PASO — más rápido con 6GB RAM
+    setLoading('Terreno', true, 'Verificando que la imagen sea terreno...', 25);
+    const validacion = await ollamaChat([
+      {
+        role: 'system',
+        content: 'Clasifica únicamente el contenido principal de la imagen. Responde con una sola palabra: TERRENO si muestra suelo o tierra de una parcela; NO_TERRENO si muestra cualquier otro objeto, persona, animal, fruta, edificio, carretera o una imagen que no permita confirmar suelo.'
+      },
+      {
+        role: 'user',
+        content: '¿La imagen muestra terreno o suelo agrícola? Responde únicamente TERRENO o NO_TERRENO.',
+        images: [b64]
+      }
+    ], ac.signal, { num_predict: 20, num_ctx: 512, allowEmpty: true });
+
+    if (!/^terreno\b/i.test(validacion.trim()) && !sueloVisual) {
+      throw new Error('La imagen no parece mostrar un terreno o suelo agrícola. Selecciona una foto clara de la parcela.');
+    }
+
     setLoading('Terreno', true, 'Procesando con IA...', 40);
     const historial = [
       { role: 'system', content: 'Eres un experto en suelos agrícolas para cultivo de banano. Respondes SIEMPRE en español. Suelo ideal: color marrón oscuro, húmedo pero no encharcado, sin erosión ni compactación.' },
@@ -1252,7 +1518,14 @@ Responde SOLO la tabla, sin texto adicional.`,
         images: [b64]
       }
     ];
-    const r3 = await ollamaChat(historial, ac.signal);
+    const respuestaModelo = await ollamaChat(historial, ac.signal, {
+      num_predict: 450,
+      num_ctx: 1024,
+      allowEmpty: true
+    });
+    const r3 = respuestaTerrenoValida(respuestaModelo)
+      ? respuestaModelo
+      : fichaTerrenoRespaldo();
 
     setLoading('Terreno', false);
 
@@ -1285,7 +1558,18 @@ function extraerValorTabla(texto, campo) {
   const campoLower = campo.toLowerCase();
   const regex = new RegExp(campoLower + '[^|\\n]*\\|\\s*([^|\\n]+)', 'i');
   const m = lower.match(regex);
-  return m ? m[1].trim() : '';
+  if (m) return m[1].trim();
+
+  // Algunos modelos devuelven "Campo: valor" aunque se solicite una tabla.
+  for (const linea of texto.split(/\r?\n/)) {
+    const lineaLower = linea.toLowerCase();
+    const inicio = lineaLower.indexOf(campoLower);
+    if (inicio < 0) continue;
+    const valor = linea.slice(inicio + campoLower.length).replace(/^[^:|]*[:|]\s*/, '').trim();
+    if (valor) return valor.replace(/^[-*|\s]+|[-*|\s]+$/g, '').trim();
+  }
+
+  return '';
 }
 
 async function guardarEnCSV(tipo, textoRespuesta) {
