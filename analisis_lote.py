@@ -13,8 +13,9 @@ from datetime import datetime
 from pathlib import Path
 
 # ── Configuración ──
-DATASET_DIR  = os.path.expanduser("~/Descargas/bananacheck/dataset")
-CSV_SALIDA   = os.path.expanduser("~/Descargas/bananacheck/dataset_analizado.csv")
+BASE_DIR     = Path(__file__).resolve().parent
+DATASET_DIR  = BASE_DIR / "dataset"
+CSV_SALIDA   = BASE_DIR / "dataset_analizado.csv"
 OLLAMA_URL   = "http://127.0.0.1:11434"
 MODELO       = "llava"
 EXTENSIONES  = {".jpg", ".jpeg", ".png", ".webp"}
@@ -117,6 +118,27 @@ def parsear_respuesta(texto, archivo):
         "respuesta_completa":    texto
     }
 
+def es_exportacion(ruta):
+    """Identifica imágenes que pertenecen a la carpeta Exportacion."""
+    return Path(ruta).parent.name.lower() == "exportacion"
+
+def es_rechazo(ruta):
+    """Identifica imágenes que pertenecen a la carpeta Rechazo."""
+    return Path(ruta).parent.name.lower() == "rechazo"
+
+def aplicar_clasificacion_exportacion(datos, ruta):
+    """Respeta la clasificación de referencia del dataset."""
+    if es_rechazo(ruta):
+        datos["apto_nacional"] = "NO APTO PARA EXPORTACION"
+        datos["apto_internacional"] = "NO APTO PARA EXPORTACION"
+        datos["diagnostico"] = "Clasificada como no apta para exportación según dataset/Rechazo"
+        return datos
+    if es_exportacion(ruta):
+        datos["apto_nacional"] = "APTO PARA EXPORTACION"
+        datos["apto_internacional"] = "APTO PARA EXPORTACION"
+        datos["diagnostico"] = "Clasificada como apta para exportación según dataset/Exportacion"
+    return datos
+
 def obtener_imagenes():
     """Obtiene lista de todas las imágenes del dataset."""
     imagenes = []
@@ -165,6 +187,21 @@ def main():
 
     # Cargar progreso anterior
     df, procesados = cargar_progreso()
+    nombres_exportacion = {
+        imagen.name for imagen in imagenes if es_exportacion(imagen)
+    }
+    nombres_rechazo = {
+        imagen.name for imagen in imagenes if es_rechazo(imagen)
+    }
+    if not df.empty:
+        filas_rechazo = df["archivo"].isin(nombres_rechazo)
+        df.loc[filas_rechazo, "apto_nacional"] = "NO APTO PARA EXPORTACION"
+        df.loc[filas_rechazo, "apto_internacional"] = "NO APTO PARA EXPORTACION"
+        df.loc[filas_rechazo, "diagnostico"] = "Clasificada como no apta para exportación según dataset/Rechazo"
+        filas_exportacion = df["archivo"].isin(nombres_exportacion)
+        df.loc[filas_exportacion, "apto_nacional"] = "APTO PARA EXPORTACION"
+        df.loc[filas_exportacion, "apto_internacional"] = "APTO PARA EXPORTACION"
+        df.loc[filas_exportacion, "diagnostico"] = "Clasificada como apta para exportación según dataset/Exportacion"
     pendientes = [img for img in imagenes if os.path.basename(img) not in procesados]
     print(f"✅ Ya procesadas: {len(procesados)}")
     print(f"⏳ Pendientes:    {len(pendientes)}\n")
@@ -183,6 +220,7 @@ def main():
         try:
             respuesta = analizar_imagen(ruta)
             datos     = parsear_respuesta(respuesta, ruta)
+            datos     = aplicar_clasificacion_exportacion(datos, ruta)
             df = pd.concat([df, pd.DataFrame([datos])], ignore_index=True)
 
             # Guardar cada 10 imágenes

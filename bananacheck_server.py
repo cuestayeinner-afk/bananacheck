@@ -15,15 +15,18 @@ from urllib.parse import urlparse, parse_qs
 try:
     from yolo_inference import inicializar as init_yolo, detector
     YOLO_DISPONIBLE = True
-except ImportError:
+except (ImportError, SystemExit):
     YOLO_DISPONIBLE = False
     print("⚠️  yolo_inference no disponible — análisis sin YOLOv8")
 
 # ── Configuración ──
 PUERTO      = 9090
-DIRECTORIO  = os.path.expanduser("~/Descargas/bananacheck")
-CSV_FRUTA   = os.path.expanduser("~/Descargas/bananacheck/datos_fruta.csv")
-CSV_TERRENO = os.path.expanduser("~/Descargas/bananacheck/datos_terreno.csv")
+DIRECTORIO  = os.path.dirname(os.path.abspath(__file__))
+CSV_FRUTA   = os.path.join(DIRECTORIO, "datos_fruta.csv")
+CSV_TERRENO = os.path.join(DIRECTORIO, "datos_terreno.csv")
+DATASET_SOIL = os.path.join(
+    DIRECTORIO, "dataset", "soil.v1i.folder", "test"
+)
 
 # ── Columnas del dataframe de fruta ──
 COLS_FRUTA = [
@@ -55,6 +58,7 @@ COLS_TERRENO = [
 
 def inicializar_csv():
     """Crea los CSV si no existen."""
+    os.makedirs(DIRECTORIO, exist_ok=True)
     if not os.path.exists(CSV_FRUTA):
         pd.DataFrame(columns=COLS_FRUTA).to_csv(CSV_FRUTA, index=False)
         print(f"✅ CSV fruta creado: {CSV_FRUTA}")
@@ -88,6 +92,13 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.address_string()} — {format % args}")
 
+    def do_GET(self):
+        ruta = urlparse(self.path)
+        if ruta.path == "/clasificar/suelo":
+            self._clasificar_suelo_nombre(parse_qs(ruta.query).get("nombre", [""])[0])
+            return
+        super().do_GET()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self._headers_cors()
@@ -104,6 +115,8 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             self._stats()
         elif ruta == "/yolo/detectar":
             self._yolo_detectar()
+        elif ruta == "/clasificar/suelo":
+            self._clasificar_suelo()
         else:
             self.send_response(404)
             self.end_headers()
@@ -157,6 +170,41 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             self._headers_cors()
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def _clasificar_suelo(self):
+        """Consulta si una imagen pertenece a Soil o Not_Soil del dataset de test."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            datos = json.loads(self.rfile.read(length))
+            self._clasificar_suelo_nombre(datos.get("nombre", ""))
+        except Exception as e:
+            self.send_response(500)
+            self._headers_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"encontrada": False, "error": str(e)}).encode())
+
+    def _clasificar_suelo_nombre(self, nombre):
+        nombre = os.path.basename(str(nombre))
+        try:
+            clase = None
+            for nombre_clase, etiqueta in (("Soil", "tierra"), ("Not_Soil", "no_tierra")):
+                carpeta = os.path.join(DATASET_SOIL, nombre_clase)
+                if os.path.isfile(os.path.join(carpeta, nombre)):
+                    clase = etiqueta
+                    break
+
+            self.send_response(200)
+            self._headers_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"encontrada": clase is not None, "clase": clase}).encode())
+        except Exception as e:
+            self.send_response(500)
+            self._headers_cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"encontrada": False, "error": str(e)}).encode())
 
     def _yolo_detectar(self):
         """Endpoint para detección YOLOv8 de bananos."""

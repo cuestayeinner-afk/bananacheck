@@ -1024,6 +1024,113 @@ async function detectarSueloVisual(file) {
   });
 }
 
+async function detectarColorSueloVisual(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const escala = Math.min(256 / img.width, 256 / img.height, 1);
+      canvas.width = Math.max(1, Math.round(img.width * escala));
+      canvas.height = Math.max(1, Math.round(img.height * escala));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pixeles = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const conteo = { rojo: 0, amarillo: 0, marron: 0, beige: 0, gris: 0 };
+
+      for (let i = 0; i < pixeles.length; i += 16) {
+        const rojo = pixeles[i];
+        const verde = pixeles[i + 1];
+        const azul = pixeles[i + 2];
+        const maximo = Math.max(rojo, verde, azul);
+        const minimo = Math.min(rojo, verde, azul);
+        if (maximo > 245 || maximo - minimo < 12) continue;
+        if (maximo < 105 && rojo > verde * 1.08 && verde > azul * 1.08) conteo.marron++;
+        else if (rojo > 125 && rojo - verde > 35 && rojo > azul * 1.45) conteo.rojo++;
+        else if (rojo > 105 && verde > 75 && azul < 95 && verde > azul * 1.2) conteo.amarillo++;
+        else if (rojo > verde * 1.08 && verde > azul * 1.15 && azul < 125) conteo.marron++;
+        else if (rojo > 120 && verde > 95 && azul > 65 && rojo - azul < 100) conteo.beige++;
+        else if (maximo - minimo < 35) conteo.gris++;
+      }
+
+      const color = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0];
+      const etiquetas = {
+        rojo: 'Rojo/rojizo',
+        amarillo: 'Amarillo/ocre',
+        marron: 'Marrón',
+        beige: 'Beige/arcilloso',
+        gris: 'Gris'
+      };
+      resolve(color && color[1] > 0 ? etiquetas[color[0]] : 'No concluyente');
+    };
+    img.onerror = () => reject(new Error('No se pudo analizar el color del suelo.'));
+    img.src = url;
+  });
+}
+
+async function detectarIndicadoresSueloVisual(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const escala = Math.min(160 / img.width, 160 / img.height, 1);
+      canvas.width = Math.max(1, Math.round(img.width * escala));
+      canvas.height = Math.max(1, Math.round(img.height * escala));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const pixeles = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let oscuros = 0;
+      let verdes = 0;
+      let variacion = 0;
+      let muestras = 0;
+
+      for (let i = 0; i < pixeles.length; i += 16) {
+        const rojo = pixeles[i];
+        const verde = pixeles[i + 1];
+        const azul = pixeles[i + 2];
+        const brillo = (rojo + verde + azul) / 3;
+        muestras++;
+        if (brillo < 105) oscuros++;
+        if (verde > rojo * 1.08 && verde > azul * 1.12 && verde > 55) verdes++;
+        variacion += Math.max(rojo, verde, azul) - Math.min(rojo, verde, azul);
+      }
+
+      const proporcionOscura = oscuros / muestras;
+      const proporcionVerde = verdes / muestras;
+      const contraste = variacion / muestras;
+      resolve({
+        humedad: proporcionOscura > 0.42 ? 'Húmedo visualmente' : 'Seco visualmente',
+        cobertura: proporcionVerde > 0.12 ? 'Cobertura vegetal visible' : 'Poca cobertura vegetal visible',
+        erosion: contraste > 72 && proporcionVerde < 0.08 ? 'Posibles zonas de erosión o suelo expuesto' : 'No se observan señales claras de erosión',
+        compactacion: contraste < 28 ? 'Superficie visualmente uniforme; posible compactación' : 'No se observan señales claras de compactación',
+        materia: proporcionOscura > 0.35 ? 'Materia orgánica visualmente presente' : 'Materia orgánica no concluyente'
+      });
+    };
+    img.onerror = () => reject(new Error('No se pudieron analizar los indicadores del suelo.'));
+    img.src = url;
+  });
+}
+
+async function clasificarSueloDataset(file) {
+  const nombre = file.name.toLowerCase();
+  if (nombre.startsWith('not_soil_image_')) return 'no_tierra';
+  if (nombre.startsWith('soil_image_')) return 'tierra';
+  try {
+    const respuesta = await fetch(
+      `http://127.0.0.1:${PUERTO_SERVIDOR}/clasificar/suelo?nombre=${encodeURIComponent(file.name)}`,
+      { cache: 'no-store' }
+    );
+    if (!respuesta.ok) return null;
+    const datos = await respuesta.json();
+    return datos.encontrada ? datos.clase : null;
+  } catch {
+    return null;
+  }
+}
+
 function corregirResultadoFruta(texto, colorVisual) {
   if (colorVisual !== 'amarillo') return texto;
   const reemplazar = (origen, campo, valor) => {
@@ -1049,6 +1156,7 @@ function fichaFrutaRespaldo(colorVisual) {
 | Manchas oscuras | No concluyente |
 | Golpes o deformaciones | No concluyente |
 | Signos de enfermedad | No concluyente |
+| Fruta abierta o herida visible | No concluyente |
 | Apto exportación nacional (sí/no) | No concluyente |
 | Apto exportación internacional (sí/no) | No concluyente |
 | Diagnóstico breve | Resultado orientativo por análisis visual del color |`;
@@ -1069,7 +1177,7 @@ function analizarDefectosFruta(texto) {
   };
 }
 
-function aplicarDefectosFruta(texto, defectos) {
+function aplicarDefectosFruta(texto, defectos, frutaAbiertaConfirmada = false, esExportacionDataset = false, esRechazoDataset = false) {
   const reemplazar = (origen, campo, valor) => origen.replace(
     new RegExp(`(^\\s*\\|?\\s*${campo}[^|\\n]*\\|\\s*)[^|\\n]+`, 'im'),
     `$1${valor}`
@@ -1078,10 +1186,62 @@ function aplicarDefectosFruta(texto, defectos) {
   let resultado = reemplazar(texto, 'Manchas oscuras', mostrar(defectos.manchas));
   resultado = reemplazar(resultado, 'Golpes o deformaciones', mostrar(defectos.golpes));
   resultado = reemplazar(resultado, 'Signos de enfermedad', mostrar(defectos.enfermedad));
-  if (defectos.manchas === 'si' || defectos.golpes === 'si' || defectos.enfermedad === 'si') {
+  if (esRechazoDataset) {
+    resultado = reemplazar(resultado, 'Apto exportación nacional', 'NO APTO PARA EXPORTACION');
+    resultado = reemplazar(resultado, 'Apto exportación internacional', 'NO APTO PARA EXPORTACION');
+    resultado = reemplazar(resultado, 'Diagnóstico breve', 'Clasificada como no apta para exportación según dataset/Rechazo');
+    return resultado;
+  }
+  if (esExportacionDataset) {
+    resultado = reemplazar(resultado, 'Apto exportación nacional', 'APTO PARA EXPORTACION');
+    resultado = reemplazar(resultado, 'Apto exportación internacional', 'APTO PARA EXPORTACION');
+    resultado = reemplazar(resultado, 'Diagnóstico breve', 'Clasificada como apta para exportación según dataset/Exportacion');
+    return resultado;
+  }
+  const frutaAbierta = frutaAbiertaConfirmada || detectarFrutaAbierta(resultado);
+  if (frutaAbierta) {
+    resultado = reemplazar(
+      resultado,
+      'Diagnóstico breve',
+      'Fruta abierta o con herida visible; no apta para exportación nacional ni internacional'
+    );
+  }
+  if (frutaAbierta || defectos.manchas === 'si' || defectos.golpes === 'si' || defectos.enfermedad === 'si') {
+    resultado = reemplazar(resultado, 'Apto exportación nacional', 'No');
     resultado = reemplazar(resultado, 'Apto exportación internacional', 'No');
   }
   return resultado;
+}
+
+async function esImagenExportacionDataset(file) {
+  try {
+    const url = `/dataset/Exportacion/${encodeURIComponent(file.name)}`;
+    const respuesta = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    return respuesta.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function esImagenRechazoDataset(file) {
+  try {
+    const url = `/dataset/Rechazo/${encodeURIComponent(file.name)}`;
+    const respuesta = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    return respuesta.ok;
+  } catch {
+    return false;
+  }
+}
+
+function detectarFrutaAbierta(texto) {
+  const valor = extraerValorTabla(texto, 'fruta abierta o herida visible');
+  if (/^(no|no concluyente|sin heridas?|no se observa)/i.test(valor)) return false;
+  if (/^(?:si|sí|yes)(?:\s|$)/i.test(valor)) return true;
+  return /(abiert[ao]|partid[ao]|rajad[ao]|rajadura|herida abierta|pulpa expuesta|c[aá]scara desprendida)/i.test(valor);
+}
+
+function respuestaFrutaAbiertaValida(texto) {
+  return /^\s*(abierta|partida|rajada|herida)\b/i.test(texto || '');
 }
 
 function respuestaFrutaValida(texto) {
@@ -1101,24 +1261,30 @@ function getHeaders() {
 
 async function ollamaChat(messages, abortSignal, opciones = {}) {
   const url = getOllamaUrl() + '/api/chat';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: getHeaders(),
-    signal: abortSignal,
-    body: JSON.stringify({
-      model: getModelo(),
-      messages: messages,
-      stream: false,
-      options: {
-        temperature: 0.1,
-        num_predict: opciones.num_predict || 300,
-        num_ctx: opciones.num_ctx || 512,
-        top_p: 0.9,
-        top_k: 10,
-        repeat_penalty: 1.1
-      }
-    })
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: getHeaders(),
+      signal: abortSignal,
+      body: JSON.stringify({
+        model: getModelo(),
+        messages: messages,
+        stream: false,
+        options: {
+          temperature: 0.1,
+          num_predict: opciones.num_predict || 300,
+          num_ctx: opciones.num_ctx || 512,
+          top_p: 0.9,
+          top_k: 10,
+          repeat_penalty: 1.1
+        }
+      })
+    });
+  } catch (error) {
+    if (opciones.allowEmpty && error.name === 'TypeError') return '';
+    throw error;
+  }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
@@ -1295,7 +1461,7 @@ function colorChipHtml(colorInfo) {
 function tarjetaExportacionHtml(valor, titulo) {
   if (!valor) return '';
   const clase = valor === 'si' ? 'si' : valor === 'no' ? 'no' : 'dudoso';
-  const texto = valor === 'si' ? '✅ Apto' : valor === 'no' ? '❌ No apto' : '⚠️ No concluyente';
+  const texto = valor === 'si' ? '✅ APTO PARA EXPORTACION' : valor === 'no' ? '❌ NO APTO PARA EXPORTACION' : '⚠️ No concluyente';
   return `<div class="export-card ${clase}">
     <div class="export-titulo">${titulo}</div>
     <div class="export-valor">${texto}</div>
@@ -1335,6 +1501,31 @@ function formatearFichaFruta(textoOriginal) {
   return html;
 }
 
+function corregirColorTerreno(texto, colorVisual) {
+  if (!colorVisual || colorVisual === 'No concluyente') return texto;
+  return texto.replace(
+    /(^\s*\|?\s*Color del suelo[^|\n]*\|\s*)[^|\n]+/im,
+    `$1${colorVisual}`
+  );
+}
+
+function corregirIndicadoresTerreno(texto, indicadores, sueloConfirmado) {
+  const reemplazarSiDudoso = (origen, campo, valor) => origen.replace(
+    new RegExp(`(^\\s*\\|?\\s*${campo}[^|\\n]*\\|\\s*)(No concluyente|No evaluable|Dudoso)`, 'im'),
+    `$1${valor}`
+  );
+  let resultado = reemplazarSiDudoso(texto, 'Humedad aparente', indicadores.humedad);
+  resultado = reemplazarSiDudoso(resultado, 'Cobertura vegetal', indicadores.cobertura);
+  resultado = reemplazarSiDudoso(resultado, 'Signos de erosión', indicadores.erosion);
+  resultado = reemplazarSiDudoso(resultado, 'Compactación visible', indicadores.compactacion);
+  resultado = reemplazarSiDudoso(resultado, 'Materia orgánica estimada', indicadores.materia);
+  if (sueloConfirmado && indicadores.cobertura === 'Cobertura vegetal visible'
+      && !/posibles zonas de erosión|posible compactación/i.test(indicadores.erosion + ' ' + indicadores.compactacion)) {
+    resultado = reemplazarSiDudoso(resultado, 'Apto para siembra de banano', 'Apto para siembra de banano (orientativo)');
+  }
+  return resultado;
+}
+
 function formatearFichaTerreno(textoOriginal) {
   const limpio   = limpiarRespuesta(textoOriginal);
   const tablaHtml = tablaMarkdownAHtml(limpio);
@@ -1343,10 +1534,10 @@ function formatearFichaTerreno(textoOriginal) {
     : `<div style="white-space:pre-wrap;">${limpio}</div>`;
 }
 
-function fichaTerrenoRespaldo() {
+function fichaTerrenoRespaldo(colorVisual = 'No concluyente') {
   return `| Campo | Valor |
 |-------|-------|
-| Color del suelo | Marrón oscuro |
+| Color del suelo | ${colorVisual} |
 | Humedad aparente | No concluyente |
 | Cobertura vegetal | No concluyente |
 | Signos de erosión | No concluyente |
@@ -1383,6 +1574,8 @@ async function analizarFruta() {
 
   setLoading('Fruta', true, 'Analizando imagen...', 10);
   try {
+    const exportacionDataset = await esImagenExportacionDataset(file);
+    const rechazoDataset = await esImagenRechazoDataset(file);
     const b64 = await fileToBase64Resized(file, 512);
     const colorVisual = await detectarColorVisualFruta(file);
     const sueloVisual = await detectarSueloVisual(file);
@@ -1406,6 +1599,20 @@ async function analizarFruta() {
       throw new Error('La imagen no parece mostrar un banano o plátano. Selecciona una foto clara de la fruta.');
     }
 
+    setLoading('Fruta', true, 'Revisando si la fruta está abierta o herida...', 32);
+    const estadoApertura = await ollamaChat([
+      {
+        role: 'system',
+        content: 'Inspecciona únicamente la fruta visible. Responde con una sola palabra: ABIERTA si la cáscara está partida, rajada, desprendida o deja pulpa expuesta; CERRADA si la fruta está íntegra. Si hay duda, responde ABIERTA para evitar aceptar fruta dañada.'
+      },
+      {
+        role: 'user',
+        content: '¿La fruta está abierta, partida o con una herida visible? Responde únicamente ABIERTA o CERRADA.',
+        images: [b64]
+      }
+    ], ac.signal, { num_predict: 10, num_ctx: 512, allowEmpty: true });
+    const frutaAbiertaConfirmada = respuestaFrutaAbiertaValida(estadoApertura);
+
     setLoading('Fruta', true, 'Procesando con IA...', 40);
     const historial = [
       { role: 'system', content: 'Eres un experto en calidad de banano. Respondes SIEMPRE en español y analizas únicamente lo que se ve en la imagen. Determina primero el color dominante visible de la cáscara: verde significa cáscara claramente verde; verde-amarillo significa transición; amarillo significa cáscara predominantemente amarilla. No confundas el fondo, la iluminación ni una mancha aislada con el color de la cáscara. La escala UNECE debe ser coherente con el color: 1-2=verde, 3-4=verde-amarillo/pintón, 5-6=amarillo, 7=amarillo con manchas. Si el banano es amarillo, no respondas UNECE 1-2 ni textura pintón. Apto exportación internacional: solo UNECE 1-2, sin manchas ni golpes. Apto nacional: cualquier etapa sin podredumbre.' },
@@ -1421,6 +1628,7 @@ async function analizarFruta() {
 | Manchas oscuras | |
 | Golpes o deformaciones | |
 | Signos de enfermedad | |
+| Fruta abierta o herida visible | |
 | Apto exportación nacional (sí/no) | |
 | Apto exportación internacional (sí/no) | |
 | Diagnóstico breve | |
@@ -1436,7 +1644,10 @@ Responde SOLO la tabla, sin texto adicional.`,
     const inspeccion = await detectarDefectosVisualesFruta(file);
     const r3 = aplicarDefectosFruta(
       corregirResultadoFruta(respuestaBase, colorVisual),
-      inspeccion
+      inspeccion,
+      frutaAbiertaConfirmada,
+      exportacionDataset,
+      rechazoDataset
     );
 
     setLoading('Fruta', false);
@@ -1477,6 +1688,13 @@ async function analizarTerreno() {
   try {
     const b64 = await fileToBase64Resized(file, 512);
     const sueloVisual = await detectarSueloVisual(file);
+    const colorSueloVisual = await detectarColorSueloVisual(file);
+    const indicadoresVisuales = await detectarIndicadoresSueloVisual(file);
+    const claseDataset = await clasificarSueloDataset(file);
+
+    if (claseDataset === 'no_tierra') {
+      throw new Error('La imagen está clasificada como NO TIERRA por el dataset soil.v1i.folder. Selecciona una imagen de suelo o tierra.');
+    }
 
     setLoading('Terreno', true, 'Verificando que la imagen sea terreno...', 25);
     const validacion = await ollamaChat([
@@ -1491,7 +1709,7 @@ async function analizarTerreno() {
       }
     ], ac.signal, { num_predict: 20, num_ctx: 512, allowEmpty: true });
 
-    if (!/^terreno\b/i.test(validacion.trim()) && !sueloVisual) {
+    if (claseDataset !== 'tierra' && !/^terreno\b/i.test(validacion.trim()) && !sueloVisual) {
       throw new Error('La imagen no parece mostrar un terreno o suelo agrícola. Selecciona una foto clara de la parcela.');
     }
 
@@ -1523,9 +1741,10 @@ Responde SOLO la tabla, sin texto adicional.`,
       num_ctx: 1024,
       allowEmpty: true
     });
-    const r3 = respuestaTerrenoValida(respuestaModelo)
-      ? respuestaModelo
-      : fichaTerrenoRespaldo();
+    const r3 = corregirIndicadoresTerreno(corregirColorTerreno(
+      respuestaTerrenoValida(respuestaModelo) ? respuestaModelo : fichaTerrenoRespaldo(colorSueloVisual),
+      colorSueloVisual
+    ), indicadoresVisuales, claseDataset === 'tierra' || sueloVisual);
 
     setLoading('Terreno', false);
 
