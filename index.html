@@ -658,6 +658,18 @@
         <p style="margin-top:0.25rem; font-size:0.72rem;">JPG, PNG o WEBP · Máx. 10 MB</p>
       </div>
 
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+        <button class="btn-cancel" type="button" onclick="abrirCamara('Fruta')">📹 Usar cámara</button>
+      </div>
+
+      <div id="cameraPanelFruta" style="display:none; margin-top:0.75rem;">
+        <video id="cameraVideoFruta" autoplay playsinline muted style="width:100%; max-height:260px; border-radius:12px; background:#101315; object-fit:cover; display:block;"></video>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+          <button class="btn-analyze" type="button" onclick="tomarFotoDesdeCamara('Fruta')" style="flex:1; min-width:140px;">📸 Tomar foto</button>
+          <button class="btn-cancel" type="button" onclick="cerrarCamara('Fruta')" style="flex:1; min-width:140px;">✕ Cerrar</button>
+        </div>
+      </div>
+
       <button class="btn-analyze" id="btnFruta" onclick="analizarFruta()">
         <div class="spinner" id="spinnerFruta"></div>
         <span id="txtBtnFruta">⚡ Analizar Fruta</span>
@@ -698,6 +710,18 @@
         <span class="drop-icon">🌍</span>
         <p><strong>Haz clic o arrastra</strong> una foto del terreno</p>
         <p style="margin-top:0.25rem; font-size:0.72rem;">JPG, PNG o WEBP · Máx. 10 MB</p>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+        <button class="btn-cancel" type="button" onclick="abrirCamara('Terreno')">📹 Usar cámara</button>
+      </div>
+
+      <div id="cameraPanelTerreno" style="display:none; margin-top:0.75rem;">
+        <video id="cameraVideoTerreno" autoplay playsinline muted style="width:100%; max-height:260px; border-radius:12px; background:#101315; object-fit:cover; display:block;"></video>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+          <button class="btn-analyze" type="button" onclick="tomarFotoDesdeCamara('Terreno')" style="flex:1; min-width:140px;">📸 Tomar foto</button>
+          <button class="btn-cancel" type="button" onclick="cerrarCamara('Terreno')" style="flex:1; min-width:140px;">✕ Cerrar</button>
+        </div>
       </div>
 
       <button class="btn-analyze" id="btnTerreno" onclick="analizarTerreno()">
@@ -831,6 +855,7 @@
 // Controlador de abort para cancelar fetch en curso
 const abortControllers = { Fruta: null, Terreno: null };
 const resultadosPendientes = { fruta: null, terreno: null };
+let cameraStream = null;
 let configurarCuenta = false;
 let sesionActiva = false;
 let rolActivo = null;
@@ -1236,7 +1261,87 @@ function mostrarPreview(file, imgEl, wrapEl, dropEl) {
   reader.readAsDataURL(file);
 }
 
+async function abrirCamara(tipo) {
+  const fileEl = document.getElementById('file' + tipo);
+  const video = document.getElementById('cameraVideo' + tipo);
+  const panel = document.getElementById('cameraPanel' + tipo);
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showError(tipo, '📷 Esta versión del navegador no admite cámara. Prueba en Chrome o Edge.');
+    return;
+  }
+
+  try {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream = null;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+
+    cameraStream = stream;
+    video.srcObject = stream;
+    panel.style.display = 'block';
+    video.play().catch(() => {});
+    hideError(tipo);
+  } catch (error) {
+    showError(tipo, '📷 No se pudo acceder a la cámara. Verifica permisos y vuelve a intentarlo.');
+    console.error('Error cámara:', error);
+  }
+}
+
+function cerrarCamara(tipo) {
+  const video = document.getElementById('cameraVideo' + tipo);
+  const panel = document.getElementById('cameraPanel' + tipo);
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+  if (panel) panel.style.display = 'none';
+}
+
+function tomarFotoDesdeCamara(tipo) {
+  const fileEl = document.getElementById('file' + tipo);
+  const video = document.getElementById('cameraVideo' + tipo);
+  const preview = document.getElementById('preview' + tipo);
+  const wrap = document.getElementById('previewWrap' + tipo);
+  const drop = document.getElementById('drop' + tipo);
+
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    showError(tipo, '📷 Abre la cámara antes de tomar la foto.');
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob(blob => {
+    if (!blob) {
+      showError(tipo, '📷 No se pudo guardar la captura de la cámara.');
+      return;
+    }
+
+    const file = new File([blob], `captura_${tipo.toLowerCase()}.jpg`, { type: 'image/jpeg' });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileEl.files = dt.files;
+    mostrarPreview(file, preview, wrap, drop);
+    cerrarCamara(tipo);
+  }, 'image/jpeg', 0.92);
+}
+
 function limpiarImagen(id) {
+  cerrarCamara(id);
   document.getElementById('file' + id).value = '';
   document.getElementById('preview' + id).src = '';
   document.getElementById('previewWrap' + id).style.display = 'none';
