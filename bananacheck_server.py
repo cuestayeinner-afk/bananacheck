@@ -13,7 +13,7 @@ from urllib.parse import urlparse, parse_qs
 
 # Importar YOLOv8 (opcional)
 try:
-    from yolo_inference import inicializar as init_yolo, detector
+    from yolo_inference import inicializar as init_yolo, inicializar_clasificador
     YOLO_DISPONIBLE = True
 except ImportError:
     YOLO_DISPONIBLE = False
@@ -104,6 +104,8 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             self._stats()
         elif ruta == "/yolo/detectar":
             self._yolo_detectar()
+        elif ruta == "/clasificar/exportacion":
+            self._clasificar_exportacion()
         else:
             self.send_response(404)
             self.end_headers()
@@ -223,6 +225,26 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
                 "banano_detectado": False
             }).encode())
             print(f"❌ Error YOLOv8: {e}")
+
+    def _clasificar_exportacion(self):
+        """Clasifica el banano como Exportacion o Rechazo."""
+        if not YOLO_DISPONIBLE:
+            self._json_response({"success": False, "error": "ultralytics no instalado"}, 503)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            imagen = self.rfile.read(length)
+            resultado = inicializar_clasificador().clasificar(imagen)
+            self._json_response(resultado, 200 if resultado["success"] else 503)
+        except Exception as error:
+            self._json_response({"success": False, "error": str(error)}, 500)
+
+    def _json_response(self, datos, estado):
+        self.send_response(estado)
+        self._headers_cors()
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(datos).encode())
 
     def _headers_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")

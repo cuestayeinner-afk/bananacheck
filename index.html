@@ -1084,6 +1084,19 @@ function aplicarDefectosFruta(texto, defectos) {
   return resultado;
 }
 
+function aplicarClasificacionExportacion(texto, clasificacion) {
+  if (!clasificacion?.clasificacion) return texto;
+  const valor = clasificacion.clasificacion.toLowerCase() === 'exportacion' ? 'Sí' : 'No';
+  let resultado = texto.replace(
+    /(^\s*\|?\s*Apto exportación internacional[^|\n]*\|\s*)[^|\n]+/im,
+    `$1${valor}`
+  );
+  return resultado.replace(
+    /(^\s*\|?\s*Diagnóstico breve[^|\n]*\|\s*)[^|\n]+/im,
+    `$1Clasificación del dataset: ${clasificacion.clasificacion} (${(clasificacion.confianza * 100).toFixed(1)}% confianza)`
+  );
+}
+
 function respuestaFrutaValida(texto) {
   return texto && /color de la c[aá]scara/i.test(texto) && /etapa unece/i.test(texto);
 }
@@ -1368,6 +1381,20 @@ function clasificacionBananoValida(texto) {
     || /\b(banano|banana|pl[aá]tano|plantain)\b/i.test(respuesta);
 }
 
+async function clasificarExportacionServidor(file) {
+  try {
+    const respuesta = await fetch(`http://127.0.0.1:${PUERTO_SERVIDOR}/clasificar/exportacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+    const datos = await respuesta.json();
+    return datos.success ? datos : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ═══════════════════════════════════════════════
    ANÁLISIS DE FRUTA (4 pasos optimizados)
 ═══════════════════════════════════════════════ */
@@ -1434,10 +1461,11 @@ Responde SOLO la tabla, sin texto adicional.`,
       ? respuestaModelo
       : fichaFrutaRespaldo(colorVisual);
     const inspeccion = await detectarDefectosVisualesFruta(file);
-    const r3 = aplicarDefectosFruta(
+    const clasificacionExportacion = await clasificarExportacionServidor(file);
+    const r3 = aplicarClasificacionExportacion(aplicarDefectosFruta(
       corregirResultadoFruta(respuestaBase, colorVisual),
       inspeccion
-    );
+    ), clasificacionExportacion);
 
     setLoading('Fruta', false);
 

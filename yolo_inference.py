@@ -11,13 +11,14 @@ from pathlib import Path
 try:
     from ultralytics import YOLO
 except ImportError:
-    print("⚠️  ultralytics no instalado. Instala con: pip install ultralytics")
-    sys.exit(1)
+    YOLO = None
 
-import cv2
-import numpy as np
-from PIL import Image
-import io
+try:
+    import cv2
+    import numpy as np
+except ImportError:
+    cv2 = None
+    np = None
 
 class BananoDetector:
     def __init__(self, model_path=None):
@@ -27,6 +28,9 @@ class BananoDetector:
         Args:
             model_path: ruta a modelo .pt entrenado. Si es None, usa yolov8n-seg.pt
         """
+        if YOLO is None or cv2 is None or np is None:
+            self.model = None
+            return
         try:
             if model_path and os.path.exists(model_path):
                 self.model = YOLO(model_path)
@@ -50,13 +54,48 @@ class BananoDetector:
         Returns:
             dict con resultados
         """
-        if self.model is None:
+        if self.model is None or cv2 is None or np is None:
             return {
                 "success": False,
                 "error": "Modelo no cargado",
                 "banano_detectado": False,
                 "confianza": 0
             }
+
+
+class ExportacionClassifier:
+    """Clasifica imágenes del dataset en Exportacion o Rechazo."""
+
+    def __init__(self, model_path=None):
+        self.model = None
+        if YOLO is not None and model_path and os.path.exists(model_path):
+            self.model = YOLO(model_path)
+
+    def clasificar(self, image_bytes):
+        if self.model is None:
+            return {
+                "success": False,
+                "error": "Clasificador no entrenado o ultralytics no instalado",
+                "clasificacion": None,
+                "confianza": 0,
+            }
+        try:
+            array = np.frombuffer(image_bytes, np.uint8)
+            imagen = cv2.imdecode(array, cv2.IMREAD_COLOR)
+            if imagen is None:
+                raise ValueError("No se pudo cargar la imagen")
+            resultado = self.model(imagen, verbose=False)[0]
+            indice = int(resultado.probs.top1)
+            confianza = float(resultado.probs.top1conf)
+            nombre = str(resultado.names[indice])
+            return {
+                "success": True,
+                "clasificacion": nombre,
+                "confianza": confianza,
+                "apto_exportacion": nombre.lower() == "exportacion",
+            }
+        except Exception as error:
+            return {"success": False, "error": str(error), "clasificacion": None, "confianza": 0}
 
         try:
             # Cargar imagen
@@ -150,6 +189,7 @@ class BananoDetector:
 
 # Instancia global
 detector = None
+clasificador_exportacion = None
 
 def inicializar():
     """Inicializa detector al arrancar servidor."""
@@ -159,6 +199,14 @@ def inicializar():
         modelo_entrenado = os.path.expanduser("~/Descargas/bananacheck/modelo_banano.pt")
         detector = BananoDetector(modelo_entrenado if os.path.exists(modelo_entrenado) else None)
     return detector
+
+
+def inicializar_clasificador():
+    global clasificador_exportacion
+    if clasificador_exportacion is None:
+        modelo = os.path.expanduser("~/Descargas/bananacheck/modelo_exportacion.pt")
+        clasificador_exportacion = ExportacionClassifier(modelo)
+    return clasificador_exportacion
 
 
 if __name__ == "__main__":
