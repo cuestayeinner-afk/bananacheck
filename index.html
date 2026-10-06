@@ -70,9 +70,48 @@
     padding: 0.25rem 0.7rem;
     border-radius: 100px;
     white-space: nowrap;
-    position: absolute;
-    right: 0;
+    position: static;
   }
+  .header-actions { position: absolute; right: 0; display: flex; align-items: center; gap: 0.65rem; }
+  .btn-logout { border: 1px solid rgba(255,255,255,0.35); background: transparent; color: white; border-radius: 8px; padding: 0.45rem 0.7rem; font: inherit; font-size: 0.75rem; cursor: pointer; }
+  .btn-logout:hover { background: rgba(255,255,255,0.12); }
+  .role-badge { color: var(--amarillo-claro); font-size: 0.7rem; font-weight: 700; }
+
+  [hidden] { display: none !important; }
+  .auth-screen {
+    min-height: calc(100vh - 90px);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 4rem 1rem 2rem;
+    background: radial-gradient(ellipse at top, #e5f1e8 0%, var(--crema) 66%);
+  }
+  .auth-panel {
+    width: min(100%, 420px);
+    background: white;
+    border: 1px solid #e2e8df;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 16px 45px rgba(26, 46, 35, 0.12);
+  }
+  .auth-panel h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.55rem; margin-bottom: 0.45rem; color: var(--verde); }
+  .auth-panel p { color: var(--gris); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.35rem; }
+  .auth-field { display: grid; gap: 0.35rem; margin: 0.9rem 0; }
+  .auth-field label { font-size: 0.78rem; font-weight: 600; color: #34443a; }
+  .auth-field input { width: 100%; border: 1px solid #cbd5ce; border-radius: 8px; padding: 0.75rem 0.8rem; font: inherit; font-size: 0.95rem; }
+  .auth-field input:focus { outline: 3px solid rgba(82,183,136,0.22); border-color: var(--verde-medio); }
+  .password-wrap { position: relative; }
+  .password-wrap input { padding-right: 2.8rem; }
+  .toggle-password {
+    position: absolute; right: 0.7rem; top: 50%; transform: translateY(-50%);
+    border: none; background: transparent; color: var(--gris); font-size: 1.05rem;
+    cursor: pointer; padding: 0.2rem; line-height: 1; border-radius: 50%;
+  }
+  .toggle-password:hover { background: rgba(15, 118, 110, 0.08); }
+  .auth-submit { width: 100%; border: 0; border-radius: 8px; padding: 0.8rem; margin-top: 0.4rem; background: var(--verde); color: white; font: 600 0.95rem 'Space Grotesk', sans-serif; cursor: pointer; }
+  .auth-submit:disabled { opacity: 0.65; cursor: wait; }
+  .auth-error { min-height: 1.2rem; margin-top: 0.75rem; color: var(--rojo); font-size: 0.8rem; }
+  .auth-hint { margin-top: 0.85rem; color: var(--gris); font-size: 0.72rem; line-height: 1.45; }
 
   /* ── HERO ── */
   .hero {
@@ -293,6 +332,77 @@
     line-height: 1.65;
     color: #374151;
   }
+  .btn-save { width: 100%; margin-top: 1rem; border: 1px solid var(--verde-medio); border-radius: 8px; padding: 0.7rem; background: #f0fdf4; color: var(--verde); font: 600 0.86rem 'Space Grotesk', sans-serif; cursor: pointer; }
+  .btn-save:hover:not(:disabled) { background: #dcfce7; }
+  .btn-save:disabled { opacity: 0.65; cursor: wait; }
+  .save-status { min-height: 1.15rem; margin-top: 0.4rem; color: var(--verde-medio); text-align: center; font-size: 0.75rem; }
+
+  .compare-section { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.5rem 0; }
+  .workspace-nav { max-width: 1100px; margin: 0 auto; padding: 0.9rem 1.5rem 0; display: flex; gap: 0.3rem; border-bottom: 1px solid #dfe5df; }
+  .workspace-tab { border: 0; border-bottom: 3px solid transparent; background: transparent; padding: 0.7rem 0.95rem; color: var(--gris); font: 600 0.84rem 'Space Grotesk', sans-serif; cursor: pointer; }
+  .workspace-tab[aria-selected="true"] { color: var(--verde); border-bottom-color: var(--verde-claro); }
+  .compare-heading { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin-bottom: 0.85rem; }
+  .compare-heading h2 { font: 700 1.2rem 'Space Grotesk', sans-serif; color: var(--verde); }
+  .compare-heading p { margin-top: 0.2rem; color: var(--gris); font-size: 0.78rem; }
+  .compare-content { width: 100%; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); align-items: start; gap: 1.5rem; }
+  .compare-content > div, .chart-wrap, .comparison-table-wrap { min-width: 0; }
+  .chart-wrap { height: 270px; border-bottom: 1px solid #dfe5df; }
+  #healthChart { width: 100%; height: 100%; display: block; }
+  .comparison-table-wrap { width: 100%; overflow-x: auto; }
+  .comparison-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .comparison-table th, .comparison-table td { padding: 0.55rem 0.5rem; border-bottom: 1px solid #e7ece8; text-align: left; }
+  .comparison-table th { color: #526157; font-size: 0.7rem; text-transform: uppercase; }
+  .score-value { font-weight: 700; color: var(--verde-medio); white-space: nowrap; }
+  .compare-empty { color: var(--gris); font-size: 0.8rem; padding: 1rem 0; }
+  .compare-note { margin-top: 0.65rem; color: var(--gris); font-size: 0.7rem; line-height: 1.45; }
+  .staff-dashboard { max-width: 1100px; margin: 0 auto; padding: 1.6rem 1.5rem; }
+  .staff-dashboard h2 { font: 700 1.2rem 'Space Grotesk', sans-serif; color: var(--verde); }
+  .staff-dashboard > p { color: var(--gris); font-size: 0.8rem; margin: 0.25rem 0 1.1rem; }
+  .staff-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 1rem 0 1.8rem; border-block: 1px solid #dfe5df; }
+  .staff-metric { min-width: 0; padding: 0.9rem 1rem; border-right: 1px solid #dfe5df; }
+  .staff-metric:last-child { border-right: 0; }
+  .staff-metric span { display: block; color: var(--gris); font-size: 0.68rem; line-height: 1.4; }
+  .staff-metric strong { display: block; margin-top: 0.35rem; color: var(--verde); font: 700 1.55rem 'Space Grotesk', sans-serif; }
+  .staff-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin: 1rem 0 0.7rem; flex-wrap: wrap; }
+  .staff-toolbar select { border: 1px solid #cbd5ce; border-radius: 8px; background: white; padding: 0.5rem 0.7rem; font: inherit; }
+  .trend-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0 1.4rem; }
+  .trend-box { background: #f9fafb; border: 1px solid #e7ece8; border-radius: 12px; padding: 0.85rem; }
+  .trend-box h3 { font: 700 0.78rem 'Space Grotesk', sans-serif; margin-bottom: 0.7rem; color: var(--verde); }
+  .trend-bars { display: flex; align-items: end; gap: 0.35rem; min-height: 96px; }
+  .trend-bars span { flex: 1; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #9ad5b2, #2d6a4f); min-height: 6px; }
+  .trend-labels { display: flex; justify-content: space-between; font-size: 0.63rem; color: var(--gris); margin-top: 0.45rem; }
+  .farm-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.8rem; align-items: end; padding: 1rem 0; border-top: 1px solid #dfe5df; border-bottom: 1px solid #dfe5df; }
+  .farm-form .auth-field { margin: 0; }
+  .farm-form button { padding: 0.75rem 1rem; white-space: nowrap; }
+  .staff-message { min-height: 1.2rem; margin-top: 0.7rem; color: var(--verde-medio); font-size: 0.78rem; }
+  .farm-table-wrap { width: 100%; overflow-x: auto; }
+  .farm-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .farm-table th, .farm-table td { padding: 0.55rem 0.5rem; border-bottom: 1px solid #e7ece8; text-align: left; }
+  .farm-table th { color: #526157; font-size: 0.7rem; text-transform: uppercase; }
+  .history-section { max-width: 1100px; margin: 0 auto; padding: 1.6rem 1.5rem; }
+  .history-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 1rem; }
+  .history-card { background: white; border: 1px solid #e7ece8; border-radius: 12px; padding: 1rem; }
+  .history-card h3 { font: 700 0.95rem 'Space Grotesk', sans-serif; color: var(--verde); margin-bottom: 0.7rem; }
+  .history-form { display: grid; gap: 0.8rem; }
+  .history-form button { width: 100%; }
+  .history-table-wrap { width: 100%; overflow-x: auto; }
+  .history-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .history-table th, .history-table td { padding: 0.55rem 0.45rem; border-bottom: 1px solid #e7ece8; text-align: left; }
+  .history-table th { color: #526157; font-size: 0.7rem; text-transform: uppercase; }
+  .history-status { min-height: 1rem; font-size: 0.75rem; color: var(--verde-medio); margin-top: 0.5rem; }
+  @media (max-width: 720px) {
+    .header-actions { right: 0; }
+    .badge-local { display: none; }
+    .compare-content { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .compare-section { padding: 1.2rem 1rem 0; }
+    .workspace-nav { padding: 0.65rem 1rem 0; }
+    .workspace-tab { padding: 0.65rem 0.55rem; font-size: 0.76rem; }
+    .staff-dashboard { padding: 1.2rem 1rem; }
+    .staff-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .staff-metric:nth-child(2n) { border-right: 0; }
+    .staff-metric:last-child { border-right: 0; }
+    .farm-form { grid-template-columns: 1fr; }
+  }
 
   /* ── TARJETAS EXPORTACIÓN ── */
   .export-cards {
@@ -439,6 +549,9 @@
     .hero { padding: 1.75rem 1rem 1.5rem; }
     .card-body { padding: 1.1rem 1.1rem; }
     .config-inner { gap: 0.5rem; }
+    .logo { font-size: 1rem; }
+    .btn-logout { padding: 0.4rem 0.5rem; }
+    .auth-panel { padding: 1.4rem; }
   }
 </style>
 </head>
@@ -447,7 +560,11 @@
 <header>
   <div class="header-inner">
     <div class="logo">🍌 BananaCheck <span>AI Local</span></div>
-    <div class="badge-local">⚡ Ollama Local</div>
+    <div class="header-actions">
+      <span class="badge-local">⚡ Ollama Local</span>
+      <span class="role-badge" id="roleBadge" hidden></span>
+      <button class="btn-logout" id="logoutButton" onclick="cerrarSesion()" hidden>Cerrar sesión</button>
+    </div>
   </div>
 </header>
 
@@ -459,6 +576,59 @@
 <span id="statusDot" style="display:none"></span>
 <span id="statusText" style="display:none"></span>
 
+<section class="auth-screen" id="authScreen">
+  <form class="auth-panel" id="authForm" onsubmit="iniciarSesion(event)">
+    <h1 id="authHeading">Iniciar sesión</h1>
+    <p id="authDescription">Accede para analizar la fruta y el terreno, guardar resultados y comparar su estado. Si es la primera vez, la cuenta de usuario normal se crea al entrar.</p>
+    <div class="auth-field">
+      <label for="authUsername">Usuario</label>
+      <input id="authUsername" name="username" autocomplete="username" minlength="3" maxlength="64">
+    </div>
+    <div class="auth-field">
+      <label for="authPassword">Contraseña</label>
+      <div class="password-wrap">
+        <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="5" required>
+        <button type="button" class="toggle-password" data-target="authPassword" aria-label="Mostrar contraseña" title="Mostrar contraseña">👁</button>
+      </div>
+    </div>
+    <button class="auth-submit" id="authSubmit" type="submit">Entrar</button>
+    <div class="auth-error" id="authError" role="alert"></div>
+    <div class="auth-hint" id="authHint" hidden>Primera vez: crea la cuenta local de administrador. La contraseña debe tener al menos 10 caracteres.</div>
+  </form>
+</section>
+
+<div id="appShell" hidden>
+<nav class="workspace-nav" role="tablist" aria-label="Secciones de BananaCheck">
+  <button class="workspace-tab" id="analysisTab" role="tab" aria-selected="true" onclick="cambiarVista('analisis')">Análisis</button>
+  <button class="workspace-tab" id="comparisonTab" role="tab" aria-selected="false" onclick="cambiarVista('comparaciones')">Comparaciones</button>
+  <button class="workspace-tab" id="historyTab" role="tab" aria-selected="false" onclick="cambiarVista('historial')">Mi historial</button>
+  <button class="workspace-tab" id="staffTab" role="tab" aria-selected="false" onclick="cambiarVista('staff')" hidden>Panel STAFF</button>
+</nav>
+<section id="compareView" role="tabpanel" hidden>
+<section class="compare-section" aria-labelledby="compareTitle">
+  <div class="compare-heading">
+    <div>
+      <h2 id="compareTitle">Comparación de análisis guardados</h2>
+      <p>Estado saludable estimado por análisis confirmado</p>
+    </div>
+    <span id="compareCount" class="status-text"></span>
+  </div>
+  <div class="compare-content">
+    <div>
+      <div class="chart-wrap"><canvas id="healthChart" aria-label="Gráfico de salud estimada para fruta y terreno"></canvas></div>
+      <p class="compare-note">Solo aparecen los análisis guardados con su botón. El porcentaje es orientativo y usa los indicadores visibles de cada ficha.</p>
+    </div>
+    <div class="comparison-table-wrap">
+      <table class="comparison-table">
+        <thead><tr><th>Fecha</th><th>Análisis</th><th>Salud</th></tr></thead>
+        <tbody id="comparisonRows"><tr><td colspan="3" class="compare-empty">Aún no hay análisis guardados.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</section>
+
+<section id="analysisView" role="tabpanel">
 <!-- MAIN GRID -->
 <main>
 
@@ -557,10 +727,101 @@
     · Asegúrate que Ollama tenga <code style="font-size:0.75rem;background:#F3F4F6;padding:0.1rem 0.3rem;border-radius:4px;">OLLAMA_HOST=0.0.0.0</code>
   </div>
 </div>
+</section>
+
+<section class="history-section" id="historyView" role="tabpanel" hidden>
+  <div class="history-grid">
+    <div class="history-card">
+      <h3>Cambiar contraseña</h3>
+      <form class="history-form" onsubmit="cambiarContrasenaUI(event)">
+        <div class="auth-field">
+          <label for="currentPassword">Contraseña actual</label>
+          <div class="password-wrap">
+            <input id="currentPassword" type="password" autocomplete="current-password" required>
+            <button type="button" class="toggle-password" data-target="currentPassword" aria-label="Mostrar contraseña" title="Mostrar contraseña">👁</button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label for="newPassword">Nueva contraseña</label>
+          <div class="password-wrap">
+            <input id="newPassword" type="password" autocomplete="new-password" minlength="5" required>
+            <button type="button" class="toggle-password" data-target="newPassword" aria-label="Mostrar contraseña" title="Mostrar contraseña">👁</button>
+          </div>
+        </div>
+        <button class="auth-submit" type="submit">Guardar contraseña</button>
+      </form>
+      <div class="history-status" id="passwordStatus" aria-live="polite"></div>
+    </div>
+    <div class="history-card">
+      <h3>Mi historial</h3>
+      <div class="history-table-wrap">
+        <table class="history-table">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Salud</th><th>Resumen</th></tr></thead>
+          <tbody id="historyRows"><tr><td colspan="4" class="compare-empty">Aún no hay análisis registrados.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="staff-dashboard" id="staffView" role="tabpanel" hidden>
+  <h2>Panel STAFF</h2>
+  <p>Resumen operativo de fincas registradas y actividad de análisis.</p>
+  <div class="staff-metrics" aria-live="polite">
+    <div class="staff-metric"><span>Fincas registradas</span><strong id="farmCount">0</strong></div>
+    <div class="staff-metric"><span>Análisis de fruta</span><strong id="fruitAnalysisCount">0</strong></div>
+    <div class="staff-metric"><span>Análisis de terreno</span><strong id="terrainAnalysisCount">0</strong></div>
+    <div class="staff-metric"><span>Comparaciones guardadas</span><strong id="comparisonCount">0</strong></div>
+    <div class="staff-metric"><span>Salud media estimada</span><strong id="averageHealth">--</strong></div>
+  </div>
+  <div class="staff-toolbar">
+    <h2>Seguimiento</h2>
+    <label>
+      <span class="visually-hidden">Filtrar</span>
+      <select id="staffFilter" onchange="cargarPanelStaff()">
+        <option value="todos">Todos</option>
+        <option value="fruta">Fruta</option>
+        <option value="terreno">Terreno</option>
+      </select>
+    </label>
+  </div>
+  <div class="trend-wrap">
+    <div class="trend-box">
+      <h3>Tendencia · Fruta</h3>
+      <div class="trend-bars" id="trendFrutaBars"></div>
+      <div class="trend-labels" id="trendFrutaLabels"></div>
+    </div>
+    <div class="trend-box">
+      <h3>Tendencia · Terreno</h3>
+      <div class="trend-bars" id="trendTerrenoBars"></div>
+      <div class="trend-labels" id="trendTerrenoLabels"></div>
+    </div>
+  </div>
+  <h2>Registrar finca</h2>
+  <form class="farm-form" onsubmit="registrarFincaUI(event)">
+    <div class="auth-field">
+      <label for="farmName">Nombre de la finca</label>
+      <input id="farmName" maxlength="120" required>
+    </div>
+    <div class="auth-field">
+      <label for="farmLocation">Ubicación</label>
+      <input id="farmLocation" maxlength="180" placeholder="Municipio, departamento" required>
+    </div>
+    <button class="auth-submit" type="submit">Registrar finca</button>
+  </form>
+  <div class="staff-message" id="staffMessage" role="status" aria-live="polite"></div>
+  <div class="farm-table-wrap">
+    <table class="farm-table">
+      <thead><tr><th>Registro</th><th>Finca</th><th>Ubicación</th><th>Responsable</th></tr></thead>
+      <tbody id="farmRows"><tr><td colspan="4" class="compare-empty">Aún no hay fincas registradas.</td></tr></tbody>
+    </table>
+  </div>
+</section>
 
 <footer>
   BananaCheck AI Local · Modelo LLaVA vía Ollama · Normas FAO/UNECE FFV-24 · AUGURA · CENIBANANO
 </footer>
+</div>
 
 <script>
 /* ═══════════════════════════════════════════════
@@ -569,6 +830,260 @@
 
 // Controlador de abort para cancelar fetch en curso
 const abortControllers = { Fruta: null, Terreno: null };
+const resultadosPendientes = { fruta: null, terreno: null };
+let configurarCuenta = false;
+let sesionActiva = false;
+let rolActivo = null;
+let comparacionesActuales = [];
+
+function mostrarLogin(requiereConfiguracion = false) {
+  sesionActiva = false;
+  rolActivo = null;
+  configurarCuenta = requiereConfiguracion;
+  document.getElementById('authScreen').hidden = false;
+  document.getElementById('appShell').hidden = true;
+  document.getElementById('logoutButton').hidden = true;
+  document.getElementById('roleBadge').hidden = true;
+  document.getElementById('authHeading').textContent = requiereConfiguracion ? 'Crear cuenta' : 'Iniciar sesión';
+  document.getElementById('authDescription').textContent = requiereConfiguracion
+    ? 'Configura la cuenta local para proteger los análisis y sus registros.'
+    : 'Accede para analizar la fruta y el terreno, guardar resultados y comparar su estado.';
+  document.getElementById('authSubmit').textContent = requiereConfiguracion ? 'Crear cuenta e ingresar' : 'Entrar';
+  document.getElementById('authHint').hidden = !requiereConfiguracion;
+  document.getElementById('authUsername').required = requiereConfiguracion;
+  document.getElementById('authPassword').minLength = requiereConfiguracion ? 10 : 5;
+  document.getElementById('authPassword').autocomplete = requiereConfiguracion ? 'new-password' : 'current-password';
+}
+
+document.addEventListener('click', function (event) {
+  const button = event.target.closest('.toggle-password');
+  if (!button) return;
+  const input = document.getElementById(button.dataset.target);
+  if (!input) return;
+  const visible = input.type === 'text';
+  input.type = visible ? 'password' : 'text';
+  button.textContent = visible ? '👁' : '🙈';
+  button.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+  button.setAttribute('title', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+  input.focus();
+});
+
+async function verificarSesion() {
+  try {
+    const res = await fetch('/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+    const sesion = await res.json();
+    if (sesion.autenticado) mostrarAplicacion(sesion.usuario, sesion.rol);
+    else mostrarLogin(sesion.configurar_cuenta);
+  } catch (error) {
+    mostrarLogin(false);
+    document.getElementById('authError').textContent = 'No se pudo conectar con BananaCheck. Comprueba que el servidor esté activo.';
+  }
+}
+
+async function iniciarSesion(event) {
+  event.preventDefault();
+  const boton = document.getElementById('authSubmit');
+  const errorEl = document.getElementById('authError');
+  boton.disabled = true;
+  errorEl.textContent = '';
+  try {
+    const endpoint = configurarCuenta ? '/auth/setup' : '/auth/login';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        usuario: document.getElementById('authUsername').value,
+        contrasena: document.getElementById('authPassword').value
+      })
+    });
+    const respuesta = await res.json();
+    if (!res.ok || !respuesta.ok) {
+      if (respuesta.configurar_cuenta) mostrarLogin(true);
+      throw new Error(respuesta.error || 'No se pudo iniciar sesión.');
+    }
+    document.getElementById('authForm').reset();
+    mostrarAplicacion(respuesta.usuario, respuesta.rol);
+  } catch (error) {
+    errorEl.textContent = error.message;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+function mostrarAplicacion(usuario, rol) {
+  sesionActiva = true;
+  rolActivo = String(rol || '').toUpperCase();
+  document.getElementById('authScreen').hidden = true;
+  document.getElementById('appShell').hidden = false;
+  document.getElementById('logoutButton').hidden = false;
+  document.getElementById('logoutButton').title = `Sesión de ${usuario || 'usuario'}`;
+  document.getElementById('roleBadge').textContent = rolActivo === 'STAFF' && usuario === 'STAFF'
+    ? 'STAFF'
+    : `${rolActivo} · ${usuario}`;
+  document.getElementById('roleBadge').hidden = false;
+  document.getElementById('historyTab').hidden = false;
+  document.getElementById('staffTab').hidden = !['STAFF', 'ADMIN'].includes(rolActivo);
+  document.getElementById('authError').textContent = '';
+  cambiarVista('analisis');
+  autoDetectarOllama();
+  detectarIpLocal();
+  cargarComparaciones();
+}
+
+function cambiarVista(vista) {
+  if (vista === 'staff' && !['STAFF', 'ADMIN'].includes(rolActivo)) return;
+  const vistas = {
+    analisis: ['analysisView', 'analysisTab'],
+    comparaciones: ['compareView', 'comparisonTab'],
+    historial: ['historyView', 'historyTab'],
+    staff: ['staffView', 'staffTab']
+  };
+  Object.entries(vistas).forEach(([nombre, [panelId, tabId]]) => {
+    document.getElementById(panelId).hidden = nombre !== vista;
+    document.getElementById(tabId).setAttribute('aria-selected', String(nombre === vista));
+  });
+  if (vista === 'comparaciones') cargarComparaciones();
+  if (vista === 'historial') cargarHistorialUsuario();
+  if (vista === 'staff') cargarPanelStaff();
+}
+
+async function registrarFincaUI(event) {
+  event.preventDefault();
+  if (!['STAFF', 'ADMIN'].includes(rolActivo)) return;
+  const form = event.currentTarget;
+  const boton = form.querySelector('button[type="submit"]');
+  const mensaje = document.getElementById('staffMessage');
+  boton.disabled = true;
+  mensaje.textContent = 'Registrando finca...';
+  try {
+    const res = await fetch('/staff/fincas', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: document.getElementById('farmName').value,
+        ubicacion: document.getElementById('farmLocation').value
+      })
+    });
+    const respuesta = await res.json();
+    if (!res.ok) throw new Error(respuesta.error || 'No se pudo registrar la finca.');
+    form.reset();
+    mensaje.textContent = `Finca registrada · ${respuesta.total} en total`;
+    await cargarPanelStaff();
+  } catch (error) {
+    mensaje.textContent = error.message;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+async function cargarPanelStaff() {
+  if (!['STAFF', 'ADMIN'].includes(rolActivo)) return;
+  try {
+    const filtro = document.getElementById('staffFilter')?.value || 'todos';
+    const res = await fetch(`/staff/dashboard?tipo=${encodeURIComponent(filtro)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (!res.ok) throw new Error('No se pudo cargar el panel STAFF.');
+    const respuesta = await res.json();
+    const metricas = respuesta.metricas;
+    document.getElementById('farmCount').textContent = metricas.fincas;
+    document.getElementById('fruitAnalysisCount').textContent = metricas.analisis_fruta;
+    document.getElementById('terrainAnalysisCount').textContent = metricas.analisis_terreno;
+    document.getElementById('comparisonCount').textContent = metricas.comparaciones;
+    document.getElementById('averageHealth').textContent = metricas.promedio_salud_pct === null
+      ? '--'
+      : `${metricas.promedio_salud_pct}%`;
+
+    const trendFruta = respuesta.tendencia?.fruta || [];
+    const trendTerreno = respuesta.tendencia?.terreno || [];
+    renderTrendBars('trendFrutaBars', 'trendFrutaLabels', trendFruta);
+    renderTrendBars('trendTerrenoBars', 'trendTerrenoLabels', trendTerreno);
+
+    const rows = document.getElementById('farmRows');
+    rows.innerHTML = respuesta.fincas.length
+      ? respuesta.fincas.map(finca => `<tr>
+          <td>${escaparHTML(finca.fecha_registro)}</td>
+          <td>${escaparHTML(finca.nombre)}</td>
+          <td>${escaparHTML(finca.ubicacion)}</td>
+          <td>${escaparHTML(finca.registrada_por)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" class="compare-empty">Aún no hay fincas registradas.</td></tr>';
+  } catch (error) {
+    document.getElementById('staffMessage').textContent = error.message;
+  }
+}
+
+function renderTrendBars(barContainerId, labelContainerId, series) {
+  const barEl = document.getElementById(barContainerId);
+  const labelEl = document.getElementById(labelContainerId);
+  if (!barEl || !labelEl) return;
+  const datos = Array.isArray(series) && series.length ? series : Array.from({ length: 7 }, (_, index) => ({ fecha: `D${index + 1}`, total: 0 }));
+  const maxValue = Math.max(1, ...datos.map(item => Number(item.total || 0)));
+  barEl.innerHTML = datos.map(item => {
+    const height = Math.max(8, Math.round((Number(item.total || 0) / maxValue) * 100));
+    return `<span title="${escaparHTML(item.fecha)}: ${Number(item.total || 0)}" style="height:${height}%"></span>`;
+  }).join('');
+  labelEl.innerHTML = datos.map(item => `<span>${escaparHTML(String(item.fecha).slice(5) || item.fecha)}</span>`).join('');
+}
+
+async function cargarHistorialUsuario() {
+  try {
+    const res = await fetch('/mi-historial', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) throw new Error('No se pudo cargar tu historial.');
+    const respuesta = await res.json();
+    const rows = document.getElementById('historyRows');
+    rows.innerHTML = respuesta.registros?.length
+      ? respuesta.registros.slice().reverse().map(registro => `<tr>
+          <td>${escaparHTML(registro.fecha_hora || '-')}</td>
+          <td>${escaparHTML(registro.tipo || '—')}</td>
+          <td>${escaparHTML(registro.salud_pct != null ? `${registro.salud_pct}%` : '—')}</td>
+          <td>${escaparHTML(registro.resumen || 'Sin detalle')}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" class="compare-empty">Aún no hay análisis registrados.</td></tr>';
+    document.getElementById('passwordStatus').textContent = '';
+  } catch (error) {
+    document.getElementById('historyRows').innerHTML = '<tr><td colspan="4" class="compare-empty">No se pudo cargar el historial.</td></tr>';
+  }
+}
+
+async function cambiarContrasenaUI(event) {
+  event.preventDefault();
+  const formulario = event.currentTarget;
+  const boton = formulario.querySelector('button[type="submit"]');
+  const status = document.getElementById('passwordStatus');
+  const actual = document.getElementById('currentPassword').value;
+  const nueva = document.getElementById('newPassword').value;
+  boton.disabled = true;
+  status.textContent = 'Guardando contraseña...';
+  try {
+    const res = await fetch('/auth/change-password', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actual, nueva })
+    });
+    const respuesta = await res.json();
+    if (!res.ok || !respuesta.ok) throw new Error(respuesta.error || 'No se pudo cambiar la contraseña.');
+    formulario.reset();
+    status.textContent = respuesta.mensaje || 'Contraseña actualizada correctamente.';
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+async function cerrarSesion() {
+  Object.values(abortControllers).forEach(controlador => controlador?.abort());
+  try {
+    await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+  } finally {
+    mostrarLogin(false);
+  }
+}
 
 // URLs a probar en orden
 const OLLAMA_URLS = [
@@ -1383,7 +1898,7 @@ function clasificacionBananoValida(texto) {
 
 async function clasificarExportacionServidor(file) {
   try {
-    const respuesta = await fetch(`http://127.0.0.1:${PUERTO_SERVIDOR}/clasificar/exportacion`, {
+    const respuesta = await fetch('/clasificar/exportacion', {
       method: 'POST',
       headers: { 'Content-Type': file.type || 'application/octet-stream' },
       body: file,
@@ -1400,6 +1915,7 @@ async function clasificarExportacionServidor(file) {
 ═══════════════════════════════════════════════ */
 
 async function analizarFruta() {
+  if (!sesionActiva) return mostrarLogin(false);
   hideError('Fruta');
   const file = document.getElementById('fileFruta').files[0];
   if (!file) { showError('Fruta', '📷 Selecciona o arrastra una imagen del banano primero.'); return; }
@@ -1470,14 +1986,14 @@ Responde SOLO la tabla, sin texto adicional.`,
     setLoading('Fruta', false);
 
     const resultBox = document.getElementById('resultFruta');
+    resultadosPendientes.fruta = r3;
     resultBox.innerHTML = `
       <div class="result-header ok">📋 Ficha técnica — Fruta</div>
-      <div class="result-body">${formatearFichaFruta(r3)}</div>`;
+      <div class="result-body">${formatearFichaFruta(r3)}</div>
+      <button class="btn-save" id="saveFruta" onclick="guardarAnalisis('fruta')">Guardar datos fruta</button>
+      <div class="save-status" id="saveStatusFruta" aria-live="polite"></div>`;
     resultBox.style.display = 'block';
     resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-    // Guardar en CSV
-    guardarEnCSV('fruta', r3);
 
   } catch (e) {
     setLoading('Fruta', false);
@@ -1494,6 +2010,7 @@ Responde SOLO la tabla, sin texto adicional.`,
 ═══════════════════════════════════════════════ */
 
 async function analizarTerreno() {
+  if (!sesionActiva) return mostrarLogin(false);
   hideError('Terreno');
   const file = document.getElementById('fileTerreno').files[0];
   if (!file) { showError('Terreno', '🌍 Selecciona o arrastra una imagen del terreno primero.'); return; }
@@ -1558,14 +2075,14 @@ Responde SOLO la tabla, sin texto adicional.`,
     setLoading('Terreno', false);
 
     const resultBox = document.getElementById('resultTerreno');
+    resultadosPendientes.terreno = r3;
     resultBox.innerHTML = `
       <div class="result-header ok">📋 Ficha técnica — Terreno</div>
-      <div class="result-body">${formatearFichaTerreno(r3)}</div>`;
+      <div class="result-body">${formatearFichaTerreno(r3)}</div>
+      <button class="btn-save" id="saveTerreno" onclick="guardarAnalisis('terreno')">Guardar datos terreno</button>
+      <div class="save-status" id="saveStatusTerreno" aria-live="polite"></div>`;
     resultBox.style.display = 'block';
     resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-    // Guardar en CSV
-    guardarEnCSV('terreno', r3);
 
   } catch (e) {
     setLoading('Terreno', false);
@@ -1601,47 +2118,177 @@ function extraerValorTabla(texto, campo) {
 }
 
 async function guardarEnCSV(tipo, textoRespuesta) {
-  try {
-    let datos = {};
-    if (tipo === 'fruta') {
-      datos = {
-        color_cascara:         extraerValorTabla(textoRespuesta, 'color de la c'),
-        etapa_unece:           extraerValorTabla(textoRespuesta, 'etapa unece'),
-        textura:               extraerValorTabla(textoRespuesta, 'textura'),
-        manchas_oscuras:       extraerValorTabla(textoRespuesta, 'manchas oscuras'),
-        golpes_deformaciones:  extraerValorTabla(textoRespuesta, 'golpes'),
-        signos_enfermedad:     extraerValorTabla(textoRespuesta, 'signos de enfermedad'),
-        apto_nacional:         extraerValorTabla(textoRespuesta, 'exportaci'),
-        apto_internacional:    extraerValorTabla(textoRespuesta, 'internacional'),
-        diagnostico:           extraerValorTabla(textoRespuesta, 'diagn')
-      };
-    } else {
-      datos = {
-        color_suelo:       extraerValorTabla(textoRespuesta, 'color del suelo'),
-        humedad:           extraerValorTabla(textoRespuesta, 'humedad'),
-        cobertura_vegetal: extraerValorTabla(textoRespuesta, 'cobertura'),
-        erosion:           extraerValorTabla(textoRespuesta, 'erosi'),
-        compactacion:      extraerValorTabla(textoRespuesta, 'compactaci'),
-        materia_organica:  extraerValorTabla(textoRespuesta, 'materia org'),
-        apto_siembra:      extraerValorTabla(textoRespuesta, 'apto para siembra'),
-        problemas:         extraerValorTabla(textoRespuesta, 'problemas'),
-        recomendacion:     extraerValorTabla(textoRespuesta, 'recomendaci')
-      };
-    }
-
-    const res = await fetch(`http://127.0.0.1:${PUERTO_SERVIDOR}/guardar/${tipo}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      console.log(`✅ Guardado en CSV — ${tipo} — total: ${json.total}`);
-    }
-  } catch (e) {
-    console.warn('No se pudo guardar en CSV:', e.message);
+  let datos = {};
+  if (tipo === 'fruta') {
+    datos = {
+      color_cascara:         extraerValorTabla(textoRespuesta, 'color de la c'),
+      etapa_unece:           extraerValorTabla(textoRespuesta, 'etapa unece'),
+      textura:               extraerValorTabla(textoRespuesta, 'textura'),
+      manchas_oscuras:       extraerValorTabla(textoRespuesta, 'manchas oscuras'),
+      golpes_deformaciones:  extraerValorTabla(textoRespuesta, 'golpes'),
+      signos_enfermedad:     extraerValorTabla(textoRespuesta, 'signos de enfermedad'),
+      apto_nacional:         extraerValorTabla(textoRespuesta, 'exportaci'),
+      apto_internacional:    extraerValorTabla(textoRespuesta, 'internacional'),
+      diagnostico:           extraerValorTabla(textoRespuesta, 'diagn')
+    };
+  } else {
+    datos = {
+      color_suelo:       extraerValorTabla(textoRespuesta, 'color del suelo'),
+      humedad:           extraerValorTabla(textoRespuesta, 'humedad'),
+      cobertura_vegetal: extraerValorTabla(textoRespuesta, 'cobertura'),
+      erosion:           extraerValorTabla(textoRespuesta, 'erosi'),
+      compactacion:      extraerValorTabla(textoRespuesta, 'compactaci'),
+      materia_organica:  extraerValorTabla(textoRespuesta, 'materia org'),
+      apto_siembra:      extraerValorTabla(textoRespuesta, 'apto para siembra'),
+      problemas:         extraerValorTabla(textoRespuesta, 'problemas'),
+      recomendacion:     extraerValorTabla(textoRespuesta, 'recomendaci')
+    };
   }
+
+  const res = await fetch(`/guardar/${tipo}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+  const respuesta = await res.json();
+  if (!res.ok || !respuesta.ok) throw new Error(respuesta.error || 'No se pudo guardar el análisis.');
+  return respuesta;
+}
+
+async function guardarAnalisis(tipo) {
+  const boton = document.getElementById(tipo === 'fruta' ? 'saveFruta' : 'saveTerreno');
+  const estado = document.getElementById(tipo === 'fruta' ? 'saveStatusFruta' : 'saveStatusTerreno');
+  const resultado = resultadosPendientes[tipo];
+  if (!resultado || !boton) return;
+  boton.disabled = true;
+  estado.textContent = 'Guardando...';
+  try {
+    const respuesta = await guardarEnCSV(tipo, resultado);
+    resultadosPendientes[tipo] = null;
+    boton.textContent = `Guardado · ${respuesta.total} registros`;
+    estado.textContent = respuesta.salud_pct === null
+      ? 'Guardado; faltan indicadores concluyentes para puntuarlo.'
+      : `Guardado para comparar · Salud estimada: ${respuesta.salud_pct}%`;
+    await cargarComparaciones();
+  } catch (error) {
+    boton.disabled = false;
+    estado.textContent = error.message;
+  }
+}
+
+function escaparHTML(valor) {
+  const elemento = document.createElement('span');
+  elemento.textContent = String(valor ?? '');
+  return elemento.innerHTML;
+}
+
+async function cargarComparaciones() {
+  try {
+    const res = await fetch('/comparaciones', { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 401) {
+      mostrarLogin(false);
+      return;
+    }
+    if (!res.ok) throw new Error('No se pudo cargar la comparación.');
+    const respuesta = await res.json();
+    const registros = (respuesta.registros || []).map(registro => ({
+      ...registro,
+      puntaje: registro.salud_pct === '' ? null : Number(registro.salud_pct)
+    }));
+    comparacionesActuales = registros;
+    const cuerpo = document.getElementById('comparisonRows');
+    const recientes = [...registros].reverse().slice(0, 12);
+    document.getElementById('compareCount').textContent = `${registros.length} guardados`;
+    cuerpo.innerHTML = recientes.length
+      ? recientes.map(registro => `<tr>
+          <td>${escaparHTML(registro.fecha_hora)}</td>
+          <td>${registro.tipo === 'fruta' ? 'Fruta' : 'Terreno'}</td>
+          <td class="score-value">${registro.puntaje === null || Number.isNaN(registro.puntaje) ? 'Sin datos' : `${registro.puntaje}%`}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="3" class="compare-empty">Aún no hay análisis guardados.</td></tr>';
+    if (!document.getElementById('compareView').hidden) dibujarComparacion(registros);
+  } catch (error) {
+    document.getElementById('compareCount').textContent = 'Comparación no disponible';
+    console.warn(error.message);
+  }
+}
+
+function dibujarComparacion(registros = comparacionesActuales) {
+  const canvas = document.getElementById('healthChart');
+  if (!canvas || document.getElementById('appShell').hidden) return;
+  const ancho = canvas.clientWidth;
+  const alto = canvas.clientHeight;
+  if (!ancho || !alto) return;
+  const escala = window.devicePixelRatio || 1;
+  canvas.width = Math.round(ancho * escala);
+  canvas.height = Math.round(alto * escala);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(escala, escala);
+  ctx.clearRect(0, 0, ancho, alto);
+
+  const fuente = registros || [];
+  const series = [
+    { tipo: 'fruta', nombre: 'Fruta', color: '#d39b00' },
+    { tipo: 'terreno', nombre: 'Terreno', color: '#2d6a4f' }
+  ].map(serie => ({
+    ...serie,
+    valores: fuente.filter(item => item.tipo === serie.tipo && Number.isFinite(item.puntaje))
+      .map(item => item.puntaje)
+  }));
+  const margen = { izquierda: 36, derecha: 12, arriba: 34, abajo: 30 };
+  const graficoAncho = ancho - margen.izquierda - margen.derecha;
+  const graficoAlto = alto - margen.arriba - margen.abajo;
+
+  ctx.font = '11px Inter, sans-serif';
+  ctx.textBaseline = 'middle';
+  [0, 25, 50, 75, 100].forEach(valor => {
+    const y = margen.arriba + graficoAlto * (1 - valor / 100);
+    ctx.strokeStyle = '#e5ebe6';
+    ctx.beginPath();
+    ctx.moveTo(margen.izquierda, y);
+    ctx.lineTo(ancho - margen.derecha, y);
+    ctx.stroke();
+    ctx.fillStyle = '#68766d';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${valor}%`, margen.izquierda - 7, y);
+  });
+
+  let leyendaX = margen.izquierda;
+  series.forEach(serie => {
+    ctx.fillStyle = serie.color;
+    ctx.fillRect(leyendaX, 10, 11, 11);
+    ctx.fillStyle = '#34443a';
+    ctx.textAlign = 'left';
+    ctx.fillText(serie.nombre, leyendaX + 16, 15);
+    leyendaX += 82;
+    if (!serie.valores.length) return;
+    ctx.strokeStyle = serie.color;
+    ctx.fillStyle = serie.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    serie.valores.forEach((valor, indice) => {
+      const x = margen.izquierda + (serie.valores.length === 1
+        ? graficoAncho / 2
+        : graficoAncho * indice / (serie.valores.length - 1));
+      const y = margen.arriba + graficoAlto * (1 - valor / 100);
+      if (indice === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    serie.valores.forEach((valor, indice) => {
+      const x = margen.izquierda + (serie.valores.length === 1
+        ? graficoAncho / 2
+        : graficoAncho * indice / (serie.valores.length - 1));
+      const y = margen.arriba + graficoAlto * (1 - valor / 100);
+      ctx.beginPath();
+      ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+  ctx.fillStyle = '#68766d';
+  ctx.textAlign = 'center';
+  ctx.fillText('Análisis guardados por categoría', margen.izquierda + graficoAncho / 2, alto - 10);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1650,8 +2297,8 @@ async function guardarEnCSV(tipo, textoRespuesta) {
 const PUERTO_SERVIDOR = 9090;
 
 window.addEventListener('load', () => {
-  autoDetectarOllama();
-  detectarIpLocal();
+  verificarSesion();
+  window.addEventListener('resize', () => dibujarComparacion());
 });
 </script>
 </body>

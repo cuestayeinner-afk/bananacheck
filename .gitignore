@@ -1,3 +1,8 @@
 __pycache__/
 *.py[cod]
 .venv/
+.bananacheck_cuenta.json
+.bananacheck_cuenta.json.tmp
+analisis_guardados.csv
+fincas.csv
+historial_analisis.csv
