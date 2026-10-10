@@ -3,6 +3,9 @@ __pycache__/
 .venv/
 .bananacheck_cuenta.json
 .bananacheck_cuenta.json.tmp
+.bananacheck_data/
+bananacheck.db*
+bananacheck.log*
 analisis_guardados.csv
 fincas.csv
 historial_analisis.csv

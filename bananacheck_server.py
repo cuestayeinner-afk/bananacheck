@@ -10,9 +10,13 @@ import os
 import csv
 import hashlib
 import hmac
+import logging
+from logging.handlers import RotatingFileHandler
 import secrets
 import time
 from http.cookies import SimpleCookie
+from io import BytesIO, StringIO
+import bananacheck_storage as storage
 try:
     import pandas as pd
     PANDAS_DISPONIBLE = True
@@ -37,14 +41,17 @@ CSV_TERRENO = os.path.join(DIRECTORIO, "datos_terreno.csv")
 CSV_COMPARACIONES = os.path.join(DIRECTORIO, "analisis_guardados.csv")
 CSV_FINCAS = os.path.join(DIRECTORIO, "fincas.csv")
 CSV_HISTORIAL = os.path.join(DIRECTORIO, "historial_analisis.csv")
-ARCHIVO_CUENTA = os.path.join(DIRECTORIO, ".bananacheck_cuenta.json")
 CLAVE_STAFF = os.environ.get("BANANACHECK_STAFF_PASSWORD") or "STAFF"
 NOMBRE_COOKIE = "bananacheck_session"
 DURACION_SESION = 8 * 60 * 60
 SESIONES = {}
+INTENTOS_LOGIN = {}
 DATASET_SOIL = os.path.join(
     DIRECTORIO, "dataset", "soil.v1i.folder", "test"
 )
+ARCHIVO_LOG = os.path.join(storage.DATA_DIR, "bananacheck.log")
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+logger = logging.getLogger("bananacheck")
 
 # ── Columnas del dataframe de fruta ──
 COLS_FRUTA = [
@@ -98,8 +105,7 @@ def inicializar_csv():
             csv.writer(f).writerow(["fecha_hora", "tipo", "usuario", "salud_pct", "resumen"])
 
 def cargar_fincas():
-    with open(CSV_FINCAS, "r", newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+    return storage.list_farms()
 
 def registrar_finca(nombre, ubicacion, registrada_por):
     nombre = str(nombre or "").strip()
@@ -108,49 +114,26 @@ def registrar_finca(nombre, ubicacion, registrada_por):
         raise ValueError("El nombre de la finca es obligatorio y debe tener hasta 120 caracteres")
     if not ubicacion or len(ubicacion) > 180:
         raise ValueError("La ubicación es obligatoria y debe tener hasta 180 caracteres")
-    existentes = cargar_fincas()
-    duplicada = any(
-        finca["nombre"].casefold() == nombre.casefold()
-        and finca["ubicacion"].casefold() == ubicacion.casefold()
-        for finca in existentes
-    )
-    if duplicada:
-        raise ValueError("Esa finca ya está registrada en esa ubicación")
-    with open(CSV_FINCAS, "a", newline="", encoding="utf-8") as f:
-        csv.writer(f).writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"), nombre, ubicacion, registrada_por
-        ])
-    return len(existentes) + 1
-
-def _contar_registros(ruta):
-    if not os.path.exists(ruta):
-        return 0
-    with open(ruta, "r", newline="", encoding="utf-8") as f:
-        return sum(1 for _ in csv.DictReader(f))
+    try:
+        return storage.add_farm(nombre, ubicacion, registrada_por)
+    except Exception as error:
+        if "UNIQUE constraint failed" in str(error):
+            raise ValueError("Esa finca ya está registrada en esa ubicación") from error
+        raise
 
 def guardar_fruta(datos, usuario=None):
-    """Guarda un análisis de fruta en el CSV."""
+    """Completa los metadatos de un análisis de fruta antes de persistirlo."""
     datos["fecha_hora"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if usuario is not None:
         datos["usuario"] = usuario
-    nueva_fila = [datos.get(col, "") for col in COLS_FRUTA]
-    with open(CSV_FRUTA, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(nueva_fila)
-    with open(CSV_FRUTA, "r", encoding="utf-8") as f:
-        return max(0, sum(1 for _ in f) - 1)
+    return storage.count_analyses("fruta") + 1
 
 def guardar_terreno(datos, usuario=None):
-    """Guarda un análisis de terreno en el CSV."""
+    """Completa los metadatos de un análisis de terreno antes de persistirlo."""
     datos["fecha_hora"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if usuario is not None:
         datos["usuario"] = usuario
-    nueva_fila = [datos.get(col, "") for col in COLS_TERRENO]
-    with open(CSV_TERRENO, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(nueva_fila)
-    with open(CSV_TERRENO, "r", encoding="utf-8") as f:
-        return max(0, sum(1 for _ in f) - 1)
+    return storage.count_analyses("terreno") + 1
 
 def _texto_normalizado(valor):
     return str(valor or "").strip().lower()
@@ -221,42 +204,11 @@ def puntaje_salud(tipo, datos):
         (5, cobertura_sana),
     ])
 
-def _guardar_comparacion(tipo, datos):
-    puntaje = puntaje_salud(tipo, datos)
-    resumen = datos.get("diagnostico") if tipo == "fruta" else datos.get("recomendacion")
-    if puntaje is None:
-        resumen = f"{resumen or ''} (sin indicadores suficientes para puntuar)".strip()
-    with open(CSV_COMPARACIONES, "a", newline="", encoding="utf-8") as f:
-        csv.writer(f).writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tipo,
-            "" if puntaje is None else puntaje, resumen or ""
-        ])
-    return puntaje
-
 def _cargar_comparaciones():
-    with open(CSV_COMPARACIONES, "r", newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
-
-def _guardar_historial(tipo, usuario, salud_pct, resumen):
-    if not usuario:
-        return
-    with open(CSV_HISTORIAL, "a", newline="", encoding="utf-8") as f:
-        csv.writer(f).writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            str(tipo),
-            str(usuario),
-            "" if salud_pct is None else str(salud_pct),
-            str(resumen or "")
-        ])
+    return storage.list_comparisons()
 
 def _cargar_historial(usuario=None):
-    if not os.path.exists(CSV_HISTORIAL):
-        return []
-    with open(CSV_HISTORIAL, "r", newline="", encoding="utf-8") as f:
-        registros = list(csv.DictReader(f))
-    if usuario:
-        registros = [r for r in registros if (r.get("usuario") or "").casefold() == usuario.casefold()]
-    return registros
+    return storage.list_history(usuario)
 
 def _hash_credencial(usuario, contrasena, rol):
     sal = secrets.token_bytes(16)
@@ -264,23 +216,10 @@ def _hash_credencial(usuario, contrasena, rol):
     return {"usuario": usuario, "rol": rol, "sal": sal.hex(), "hash": digest.hex()}
 
 def _cargar_cuentas():
-    with open(ARCHIVO_CUENTA, "r", encoding="utf-8") as archivo:
-        datos = json.load(archivo)
-    if isinstance(datos.get("usuarios"), list):
-        return datos["usuarios"]
-    if datos.get("usuario"):
-        datos.setdefault("rol", "ADMIN")
-        return [datos]
-    raise ValueError("Formato de cuentas no válido")
+    return storage.list_accounts()
 
 def _guardar_cuentas(usuarios, crear=False):
-    modo = "x" if crear else "w"
-    ruta_temporal = ARCHIVO_CUENTA if crear else f"{ARCHIVO_CUENTA}.tmp"
-    with open(ruta_temporal, modo, encoding="utf-8") as archivo:
-        json.dump({"usuarios": usuarios}, archivo)
-    os.chmod(ruta_temporal, 0o600)
-    if not crear:
-        os.replace(ruta_temporal, ARCHIVO_CUENTA)
+    storage.save_accounts(usuarios, create=crear)
 
 class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -288,10 +227,21 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIRECTORIO, **kwargs)
 
     def log_message(self, format, *args):
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.address_string()} — {format % args}")
+        logger.info("%s %s", self.address_string(), format % args)
+
+    def _es_ruta_privada(self):
+        ruta_solicitada = os.path.realpath(self.translate_path(urlparse(self.path).path))
+        directorio_privado = os.path.realpath(storage.DATA_DIR)
+        try:
+            return os.path.commonpath((ruta_solicitada, directorio_privado)) == directorio_privado
+        except ValueError:
+            return False
 
     def do_GET(self):
         ruta = urlparse(self.path)
+        if self._es_ruta_privada() or ruta.path in ("/bananacheck.db", "/bananacheck.log"):
+            self.send_error(404)
+            return
         if ruta.path == "/auth/session":
             self._auth_session()
             return
@@ -303,6 +253,46 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
                 self._json_response({"registros": _cargar_comparaciones()}, 200)
             except Exception as error:
                 self._json_response({"error": str(error)}, 500)
+            return
+        if ruta.path == "/fincas":
+            if not self._autenticado():
+                self._json_response({"ok": False, "error": "Inicia sesión"}, 401)
+                return
+            self._json_response({"fincas": cargar_fincas()}, 200)
+            return
+        if ruta.path == "/mi-historial.csv":
+            sesion = self._sesion_actual()
+            if not sesion:
+                self._json_response({"ok": False, "error": "Inicia sesión"}, 401)
+                return
+            if sesion["rol"] != "USUARIO":
+                self._json_response({"ok": False, "error": "La exportación es exclusiva de usuarios"}, 403)
+                return
+            self._exportar_analisis_csv(parse_qs(ruta.query), usuario=sesion["usuario"])
+            return
+        if ruta.path == "/staff/model-metrics":
+            if not self._sesion_staff():
+                return
+            self._metricas_modelo()
+            return
+        if ruta.path.startswith("/analisis/") and ruta.path.endswith("/pdf"):
+            sesion = self._sesion_actual()
+            if not sesion:
+                self._json_response({"ok": False, "error": "Inicia sesión"}, 401)
+                return
+            try:
+                analysis_id = int(ruta.path.split("/")[2])
+            except (IndexError, ValueError):
+                self._json_response({"ok": False, "error": "Análisis no encontrado"}, 404)
+                return
+            registro = storage.get_analysis(analysis_id)
+            if not registro:
+                self._json_response({"ok": False, "error": "Análisis no encontrado"}, 404)
+                return
+            if sesion["rol"] != "USUARIO" or registro["username"].casefold() != sesion["usuario"].casefold():
+                self._json_response({"ok": False, "error": "La descarga PDF es exclusiva del propietario con rol de usuario"}, 403)
+                return
+            self._responder_pdf(registro)
             return
         if ruta.path == "/mi-historial":
             sesion = self._sesion_actual()
@@ -339,8 +329,8 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
                 self._json_response({
                     "metricas": {
                         "fincas": len(fincas),
-                        "analisis_fruta": sum(1 for item in historial if item.get("tipo") == "fruta") or _contar_registros(CSV_FRUTA),
-                        "analisis_terreno": sum(1 for item in historial if item.get("tipo") == "terreno") or _contar_registros(CSV_TERRENO),
+                        "analisis_fruta": storage.count_analyses("fruta"),
+                        "analisis_terreno": storage.count_analyses("terreno"),
                         "comparaciones": len(comparaciones),
                         "promedio_salud_pct": round(sum(puntajes) / len(puntajes)) if puntajes else None,
                         "filtro_actual": filtro
@@ -368,7 +358,11 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_HEAD(self):
-        if urlparse(self.path).path not in ("/", "/index.html") and not self._autenticado():
+        ruta = urlparse(self.path).path
+        if self._es_ruta_privada() or ruta in ("/bananacheck.db", "/bananacheck.log"):
+            self.send_error(404)
+            return
+        if ruta not in ("/", "/index.html") and not self._autenticado():
             self.send_error(401, "Inicia sesión")
             return
         super().do_HEAD()
@@ -415,6 +409,8 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
 
     def _cuerpo_json(self):
         length = int(self.headers.get("Content-Length", 0))
+        if length > 1024 * 1024:
+            raise ValueError("La solicitud supera el tamaño permitido")
         return json.loads(self.rfile.read(length) or b"{}")
 
     def _token_sesion(self):
@@ -448,6 +444,144 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as error:
             self._json_response({"ok": False, "error": str(error)}, 500)
 
+    def _exportar_analisis_csv(self, parametros, usuario=None):
+        filtros = {clave: valores[0] for clave, valores in parametros.items() if valores}
+        if usuario is not None:
+            filtros.pop("username", None)
+            filtros["username"] = usuario
+        tipo = filtros.get("tipo", "")
+        if tipo not in ("", "todos", "fruta", "terreno"):
+            self._json_response({"ok": False, "error": "Tipo de análisis no válido"}, 400)
+            return
+        for clave in ("desde", "hasta"):
+            if filtros.get(clave):
+                try:
+                    datetime.strptime(filtros[clave], "%Y-%m-%d")
+                except ValueError:
+                    self._json_response({"ok": False, "error": "Las fechas deben tener formato AAAA-MM-DD"}, 400)
+                    return
+        if tipo == "todos":
+            filtros.pop("tipo", None)
+        registros = storage.list_analyses(filtros)
+        columnas = ["id", "type", "created_at", "username", "farm", "health_score"]
+        for registro in registros:
+            for clave in registro:
+                if clave not in columnas and clave not in ("fecha_hora", "usuario", "finca"):
+                    columnas.append(clave)
+        salida = StringIO(newline="")
+        escritor = csv.DictWriter(salida, fieldnames=columnas, extrasaction="ignore")
+        escritor.writeheader()
+        for registro in registros:
+            fila = {
+                clave: (f"'{valor}" if isinstance(valor, str) and valor.lstrip(" \t\r").startswith(("=", "+", "-", "@")) else valor)
+                for clave, valor in registro.items()
+            }
+            escritor.writerow(fila)
+        contenido = salida.getvalue().encode("utf-8-sig")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", 'attachment; filename="bananacheck-analisis.csv"')
+        self.send_header("Content-Length", str(len(contenido)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(contenido)
+
+    def _metricas_modelo(self):
+        metricas = []
+        ruta_resultados = os.path.join(DIRECTORIO, "results.csv")
+        if os.path.isfile(ruta_resultados):
+            with open(ruta_resultados, "r", newline="", encoding="utf-8-sig") as source:
+                filas = list(csv.DictReader(source))
+            campos = (
+                ("metrics/precision(B)", "Precisión de detección"),
+                ("metrics/recall(B)", "Recall de detección"),
+                ("metrics/mAP50(B)", "mAP50 de detección"),
+                ("metrics/mAP50-95(B)", "mAP50-95 de detección"),
+                ("metrics/precision(M)", "Precisión de segmentación"),
+                ("metrics/recall(M)", "Recall de segmentación"),
+                ("metrics/mAP50(M)", "mAP50 de segmentación"),
+                ("metrics/mAP50-95(M)", "mAP50-95 de segmentación"),
+            )
+            for campo, etiqueta in campos:
+                validas = [fila for fila in filas if fila.get(campo)]
+                if validas:
+                    mejor = max(validas, key=lambda fila: float(fila[campo] or 0))
+                    metricas.append({"label": etiqueta, "value": float(mejor[campo]), "epoch": mejor.get("epoch", "")})
+        self._json_response({"metrics": metricas}, 200)
+
+    def _responder_pdf(self, registro):
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.enums import TA_CENTER
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.graphics.shapes import Drawing, Rect, String
+            from xml.sax.saxutils import escape
+
+            contenido = BytesIO()
+            documento = SimpleDocTemplate(contenido, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch)
+            estilos = getSampleStyleSheet()
+            estilos.add(ParagraphStyle(name="BananaTitle", parent=estilos["Title"], textColor=colors.HexColor("#215b43"), alignment=TA_CENTER, spaceAfter=14))
+            estilos.add(ParagraphStyle(name="FieldValue", parent=estilos["BodyText"], wordWrap="CJK"))
+            historia = [Paragraph("BananaCheck · Informe de análisis", estilos["BananaTitle"])]
+            tipo = registro["type"]
+            datos = registro["payload"]
+            etiquetas = {
+                "fruta": [("color_cascara", "Color de cáscara"), ("etapa_unece", "Etapa UNECE"), ("textura", "Textura"), ("manchas_oscuras", "Manchas oscuras"), ("golpes_deformaciones", "Golpes o deformaciones"), ("signos_enfermedad", "Signos de enfermedad"), ("apto_nacional", "Apto nacional"), ("apto_internacional", "Apto internacional"), ("diagnostico", "Diagnóstico")],
+                "terreno": [("color_suelo", "Color del suelo"), ("humedad", "Humedad"), ("cobertura_vegetal", "Cobertura vegetal"), ("erosion", "Erosión"), ("compactacion", "Compactación"), ("materia_organica", "Materia orgánica"), ("apto_siembra", "Apto para siembra"), ("problemas", "Problemas"), ("recomendacion", "Recomendación")],
+            }
+            puntaje = registro.get("health_score")
+            datos_base = [
+                ["Tipo", "Fruta" if tipo == "fruta" else "Terreno"],
+                ["Fecha", registro.get("created_at", "")],
+                ["Usuario", registro.get("username") or ""],
+                ["Finca", registro.get("farm") or "Sin especificar"],
+                ["Salud estimada", f"{puntaje}%" if puntaje is not None else "Sin datos concluyentes"],
+            ]
+            tabla_base = Table(datos_base, colWidths=[1.45 * inch, 5.4 * inch])
+            tabla_base.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#edf4ef")),
+                ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#215b43")),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d6e0d8")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("PADDING", (0, 0), (-1, -1), 7),
+            ]))
+            historia.extend([tabla_base, Spacer(1, 14)])
+            dibujo = Drawing(450, 36)
+            dibujo.add(String(0, 22, "Indicador visual de salud", fontSize=9, fillColor=colors.HexColor("#46554b")))
+            dibujo.add(Rect(0, 3, 440, 12, fillColor=colors.HexColor("#e5ece7"), strokeColor=None))
+            if puntaje is not None:
+                color = colors.HexColor("#bc5b35") if int(puntaje) < 50 else colors.HexColor("#d5a329") if int(puntaje) < 75 else colors.HexColor("#36805c")
+                dibujo.add(Rect(0, 3, 440 * max(0, min(100, int(puntaje))) / 100, 12, fillColor=color, strokeColor=None))
+            historia.extend([dibujo, Spacer(1, 10), Paragraph("Resultados", estilos["Heading2"])])
+            filas = [["Indicador", "Resultado"]]
+            for clave, etiqueta in etiquetas[tipo]:
+                valor = str(datos.get(clave) or "Sin dato")
+                filas.append([etiqueta, Paragraph(escape(valor).replace("\n", "<br/>"), estilos["FieldValue"])])
+            tabla = Table(filas, colWidths=[1.8 * inch, 5.05 * inch], repeatRows=1)
+            tabla.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#215b43")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d6e0d8")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f6f8f6")]),
+                ("PADDING", (0, 0), (-1, -1), 7),
+            ]))
+            historia.append(tabla)
+            documento.build(historia)
+            pdf = contenido.getvalue()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition", f'attachment; filename="bananacheck-{tipo}-{registro["id"]}.pdf"')
+            self.send_header("Content-Length", str(len(pdf)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(pdf)
+        except ImportError:
+            self._json_response({"ok": False, "error": "Falta instalar ReportLab para generar PDF"}, 503)
+
     def _sesion_actual(self):
         token = self._token_sesion()
         sesion = SESIONES.get(token)
@@ -462,14 +596,14 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             "autenticado": sesion is not None,
             "usuario": sesion["usuario"] if sesion else None,
             "rol": sesion["rol"] if sesion else None,
-            "configurar_cuenta": not os.path.exists(ARCHIVO_CUENTA)
+            "configurar_cuenta": not storage.has_accounts()
         }, 200)
 
     def _auth_setup(self):
         if self.client_address[0] not in ("127.0.0.1", "::1"):
             self._json_response({"ok": False, "error": "Configura la cuenta desde este equipo"}, 403)
             return
-        if os.path.exists(ARCHIVO_CUENTA):
+        if storage.has_accounts():
             self._json_response({"ok": False, "error": "La cuenta ya está configurada"}, 409)
             return
         try:
@@ -489,8 +623,34 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as error:
             self._json_response({"ok": False, "error": str(error)}, 500)
 
+    def _login_esta_limitado(self):
+        ahora = time.monotonic()
+        ip = self.client_address[0]
+        for direccion, momentos in tuple(INTENTOS_LOGIN.items()):
+            recientes = [momento for momento in momentos if ahora - momento < 300]
+            if recientes:
+                INTENTOS_LOGIN[direccion] = recientes
+            else:
+                INTENTOS_LOGIN.pop(direccion, None)
+        recientes = INTENTOS_LOGIN.get(ip, [])
+        if len(recientes) >= 5:
+            self._json_response({"ok": False, "error": "Demasiados intentos. Espera cinco minutos."}, 429)
+            return True
+        return False
+
+    def _login_fallido(self):
+        ip = self.client_address[0]
+        intentos = INTENTOS_LOGIN.setdefault(ip, [])
+        intentos.append(time.monotonic())
+        estado = 429 if len(intentos) >= 5 else 401
+        mensaje = "Demasiados intentos. Espera cinco minutos." if estado == 429 else "Usuario o contraseña incorrectos"
+        logger.warning("Fallo de autenticación desde %s; estado=%s", ip, estado)
+        self._json_response({"ok": False, "error": mensaje}, estado)
+
     def _auth_login(self):
-        if not os.path.exists(ARCHIVO_CUENTA):
+        if self._login_esta_limitado():
+            return
+        if not storage.has_accounts():
             self._json_response({"ok": False, "configurar_cuenta": True}, 409)
             return
         try:
@@ -499,6 +659,7 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             contrasena = str(datos.get("contrasena", ""))
 
             if hmac.compare_digest(contrasena.encode("utf-8"), CLAVE_STAFF.encode("utf-8")):
+                INTENTOS_LOGIN.pop(self.client_address[0], None)
                 self._iniciar_sesion(usuario or "STAFF", "STAFF")
                 return
 
@@ -516,18 +677,20 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
                     salt=sal, n=2**14, r=8, p=1
                 )
                 if hmac.compare_digest(hash_ingresado, hash_esperado):
+                    INTENTOS_LOGIN.pop(self.client_address[0], None)
                     self._iniciar_sesion(cuenta["usuario"], cuenta.get("rol", "ADMIN"))
                     return
-                self._json_response({"ok": False, "error": "Usuario o contraseña incorrectos"}, 401)
+                self._login_fallido()
                 return
 
             if usuario and len(usuario) >= 3 and len(contrasena) >= 5:
                 cuentas.append(_hash_credencial(usuario, contrasena, "USUARIO"))
                 _guardar_cuentas(cuentas)
+                INTENTOS_LOGIN.pop(self.client_address[0], None)
                 self._iniciar_sesion(usuario, "USUARIO")
                 return
 
-            self._json_response({"ok": False, "error": "Usuario o contraseña incorrectos"}, 401)
+            self._login_fallido()
         except (ValueError, KeyError, json.JSONDecodeError) as error:
             self._json_response({"ok": False, "error": "No se pudo validar la cuenta"}, 400)
 
@@ -589,15 +752,23 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
         try:
             datos = self._cuerpo_json()
             usuario = self._sesion_actual()["usuario"] if self._sesion_actual() else None
-            total = fn_guardar(datos, usuario=usuario)
-            puntaje = _guardar_comparacion(tipo, datos)
-            _guardar_historial(tipo, usuario, puntaje, datos.get("diagnostico") or datos.get("recomendacion") or "")
+            fn_guardar(datos, usuario=usuario)
+            puntaje = puntaje_salud(tipo, datos)
+            resumen = datos.get("diagnostico") or datos.get("recomendacion") or ""
+            analysis_id, total = storage.save_analysis(tipo, datos, usuario, puntaje, resumen)
             self.send_response(200)
             self._headers_cors()
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            resp = json.dumps({"ok": True, "total": total, "tipo": tipo, "salud_pct": puntaje})
+            resp = json.dumps({
+                "ok": True,
+                "id": analysis_id,
+                "total": total,
+                "tipo": tipo,
+                "salud_pct": puntaje,
+                "pdf_url": f"/analisis/{analysis_id}/pdf",
+            })
             self.wfile.write(resp.encode())
             print(f"💾 Guardado análisis de {tipo} — total registros: {total}")
         except Exception as e:
@@ -610,24 +781,21 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
 
     def _stats(self):
         try:
-            stats = {}
-            if os.path.exists(CSV_FRUTA):
-                with open(CSV_FRUTA, "r", encoding="utf-8") as f:
-                    reader = list(csv.DictReader(f))
-                    stats["fruta"] = {
-                        "total": len(reader),
-                        "aptos_nacional": sum(1 for r in reader if (r.get("apto_nacional") or "").lower() in ["sí", "si"]),
-                        "aptos_internacional": sum(1 for r in reader if (r.get("apto_internacional") or "").lower() == "no"),
-                        "ultimo": reader[-1]["fecha_hora"] if reader else None
-                    }
-            if os.path.exists(CSV_TERRENO):
-                with open(CSV_TERRENO, "r", encoding="utf-8") as f:
-                    reader = list(csv.DictReader(f))
-                    stats["terreno"] = {
-                        "total": len(reader),
-                        "aptos_siembra": sum(1 for r in reader if any(kw in (r.get("apto_siembra") or "").lower() for kw in ["sí", "si", "apto"])),
-                        "ultimo": reader[-1]["fecha_hora"] if reader else None
-                    }
+            registros_fruta = storage.list_analyses({"type": "fruta"})
+            registros_terreno = storage.list_analyses({"type": "terreno"})
+            stats = {
+                "fruta": {
+                    "total": len(registros_fruta),
+                    "aptos_nacional": sum(1 for row in registros_fruta if (row.get("apto_nacional") or "").lower() in ("sí", "si")),
+                    "aptos_internacional": sum(1 for row in registros_fruta if (row.get("apto_internacional") or "").lower() in ("sí", "si")),
+                    "ultimo": registros_fruta[0].get("fecha_hora") if registros_fruta else None,
+                },
+                "terreno": {
+                    "total": len(registros_terreno),
+                    "aptos_siembra": sum(1 for row in registros_terreno if any(kw in (row.get("apto_siembra") or "").lower() for kw in ("sí", "si", "apto"))),
+                    "ultimo": registros_terreno[0].get("fecha_hora") if registros_terreno else None,
+                },
+            }
             self.send_response(200)
             self._headers_cors()
             self.send_header("Content-Type", "application/json")
@@ -642,8 +810,7 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
     def _clasificar_suelo(self):
         """Consulta si una imagen pertenece a Soil o Not_Soil del dataset de test."""
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            datos = json.loads(self.rfile.read(length))
+            datos = self._cuerpo_json()
             self._clasificar_suelo_nombre(datos.get("nombre", ""))
         except Exception as e:
             self.send_response(500)
@@ -690,6 +857,10 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
 
         try:
             # Leer imagen multipart
+            length = int(self.headers.get("Content-Length", 0))
+            if length <= 0 or length > MAX_UPLOAD_BYTES:
+                self._json_response({"ok": False, "error": "La imagen debe pesar como máximo 10 MB"}, 413)
+                return
             content_type = self.headers.get("Content-Type", "")
             if "multipart/form-data" in content_type:
                 # Parsear multipart
@@ -747,6 +918,9 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", 0))
+            if length <= 0 or length > MAX_UPLOAD_BYTES:
+                self._json_response({"success": False, "error": "La imagen debe pesar como máximo 10 MB"}, 413)
+                return
             imagen = self.rfile.read(length)
             resultado = inicializar_clasificador().clasificar(imagen)
             self._json_response(resultado, 200 if resultado["success"] else 503)
@@ -768,7 +942,24 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, ngrok-skip-browser-warning")
 
+def create_server(host="0.0.0.0", port=PUERTO, handler_cls=BananaCheckHandler):
+    try:
+        http.server.HTTPServer.allow_reuse_address = True
+        return http.server.ThreadingHTTPServer((host, port), handler_cls)
+    except OSError as exc:
+        if exc.errno in {98, 48}:
+            raise RuntimeError(
+                f"El puerto {port} ya está ocupado. Cierra la otra instancia de BananaCheck o cambia BANANACHECK_PORT/PUERTO antes de arrancar."
+            ) from exc
+        raise
+
+
 if __name__ == "__main__":
+    os.makedirs(storage.DATA_DIR, exist_ok=True)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(RotatingFileHandler(ARCHIVO_LOG, maxBytes=1_000_000, backupCount=3, encoding="utf-8"))
+    logger.handlers[0].setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    storage.initialize()
     inicializar_csv()
     if YOLO_DISPONIBLE:
         try:
@@ -776,8 +967,11 @@ if __name__ == "__main__":
             print("✅ YOLOv8 inicializado")
         except Exception as e:
             print(f"⚠️  Error inicializando YOLOv8: {e}")
-    http.server.HTTPServer.allow_reuse_address = True
-    server = http.server.HTTPServer(("0.0.0.0", PUERTO), BananaCheckHandler)
+    try:
+        server = create_server()
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        raise SystemExit(1)
     print(f"""
 ╔══════════════════════════════════════╗
 ║   BananaCheck AI — Servidor activo   ║

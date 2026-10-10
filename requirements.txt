@@ -1,0 +1,2 @@
+# Dependencias del servidor y descarga de informes PDF.
+reportlab>=4.0,<5.0

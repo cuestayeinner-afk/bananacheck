@@ -335,6 +335,7 @@
   .btn-save { width: 100%; margin-top: 1rem; border: 1px solid var(--verde-medio); border-radius: 8px; padding: 0.7rem; background: #f0fdf4; color: var(--verde); font: 600 0.86rem 'Space Grotesk', sans-serif; cursor: pointer; }
   .btn-save:hover:not(:disabled) { background: #dcfce7; }
   .btn-save:disabled { opacity: 0.65; cursor: wait; }
+  .pdf-download { display: block; text-align: center; text-decoration: none; }
   .save-status { min-height: 1.15rem; margin-top: 0.4rem; color: var(--verde-medio); text-align: center; font-size: 0.75rem; }
 
   .compare-section { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.5rem 0; }
@@ -778,6 +779,28 @@
     </div>
     <div class="history-card">
       <h3>Mi historial</h3>
+      <div id="userExportPanel" hidden>
+        <h3>Exportar mis análisis</h3>
+        <form class="history-form" onsubmit="exportarMiHistorialCSV(event)">
+          <div class="auth-field">
+            <label for="myExportType">Tipo</label>
+            <select id="myExportType"><option value="todos">Todos</option><option value="fruta">Fruta</option><option value="terreno">Terreno</option></select>
+          </div>
+          <div class="auth-field">
+            <label for="myExportFrom">Desde</label>
+            <input id="myExportFrom" type="date">
+          </div>
+          <div class="auth-field">
+            <label for="myExportTo">Hasta</label>
+            <input id="myExportTo" type="date">
+          </div>
+          <div class="auth-field">
+            <label for="myExportFarm">Finca</label>
+            <input id="myExportFarm" maxlength="120">
+          </div>
+          <button class="auth-submit" type="submit">Descargar CSV</button>
+        </form>
+      </div>
       <div class="history-table-wrap">
         <table class="history-table">
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Salud</th><th>Resumen</th></tr></thead>
@@ -798,6 +821,13 @@
     <div class="staff-metric"><span>Comparaciones guardadas</span><strong id="comparisonCount">0</strong></div>
     <div class="staff-metric"><span>Salud media estimada</span><strong id="averageHealth">--</strong></div>
   </div>
+  <div class="farm-table-wrap" style="margin-top:1rem;">
+    <table class="farm-table">
+      <thead><tr><th>Métrica del modelo</th><th>Mejor valor registrado</th><th>Época</th></tr></thead>
+      <tbody id="modelMetricRows"><tr><td colspan="3" class="compare-empty">Métricas no disponibles.</td></tr></tbody>
+    </table>
+  </div>
+  <p class="compare-note">Las métricas reflejan el entrenamiento guardado en results.csv; no garantizan el resultado de un análisis individual.</p>
   <div class="staff-toolbar">
     <h2>Seguimiento</h2>
     <label>
@@ -948,11 +978,13 @@ function mostrarAplicacion(usuario, rol) {
     : `${rolActivo} · ${usuario}`;
   document.getElementById('roleBadge').hidden = false;
   document.getElementById('historyTab').hidden = false;
+  document.getElementById('userExportPanel').hidden = rolActivo !== 'USUARIO';
   document.getElementById('staffTab').hidden = !['STAFF', 'ADMIN'].includes(rolActivo);
   document.getElementById('authError').textContent = '';
   cambiarVista('analisis');
   autoDetectarOllama();
   detectarIpLocal();
+  cargarFincasAnalisis();
   cargarComparaciones();
 }
 
@@ -1022,6 +1054,14 @@ async function cargarPanelStaff() {
       ? '--'
       : `${metricas.promedio_salud_pct}%`;
 
+    const metricsResponse = await fetch('/staff/model-metrics', { credentials: 'same-origin', cache: 'no-store' });
+    if (metricsResponse.ok) {
+      const modelMetrics = await metricsResponse.json();
+      document.getElementById('modelMetricRows').innerHTML = modelMetrics.metrics.length
+        ? modelMetrics.metrics.map(item => `<tr><td>${escaparHTML(item.label)}</td><td>${Number(item.value * 100).toFixed(1)}%</td><td>${escaparHTML(item.epoch)}</td></tr>`).join('')
+        : '<tr><td colspan="3" class="compare-empty">Sin resultados de entrenamiento disponibles.</td></tr>';
+    }
+
     const trendFruta = respuesta.tendencia?.fruta || [];
     const trendTerreno = respuesta.tendencia?.terreno || [];
     renderTrendBars('trendFrutaBars', 'trendFrutaLabels', trendFruta);
@@ -1039,6 +1079,40 @@ async function cargarPanelStaff() {
   } catch (error) {
     document.getElementById('staffMessage').textContent = error.message;
   }
+}
+
+async function cargarFincasAnalisis() {
+  const selects = ['farmSelectFruta', 'farmSelectTerreno']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  if (!selects.length || !sesionActiva) return;
+  try {
+    const respuesta = await fetch('/fincas', { credentials: 'same-origin', cache: 'no-store' });
+    if (!respuesta.ok) return;
+    const datos = await respuesta.json();
+    selects.forEach(select => {
+      const seleccion = select.value;
+      select.innerHTML = '<option value="">Sin especificar</option>' + (datos.fincas || []).map(finca =>
+        `<option value="${escaparHTML(finca.nombre)}">${escaparHTML(finca.nombre)} · ${escaparHTML(finca.ubicacion)}</option>`
+      ).join('');
+      select.value = seleccion;
+    });
+  } catch (error) {
+    console.warn('No se pudieron cargar las fincas.');
+  }
+}
+
+function exportarMiHistorialCSV(event) {
+  event.preventDefault();
+  if (rolActivo !== 'USUARIO') return;
+  const parametros = new URLSearchParams({ tipo: document.getElementById('myExportType').value });
+  const filtros = {
+    desde: document.getElementById('myExportFrom').value,
+    hasta: document.getElementById('myExportTo').value,
+    farm: document.getElementById('myExportFarm').value.trim()
+  };
+  Object.entries(filtros).forEach(([clave, valor]) => { if (valor) parametros.set(clave, valor); });
+  window.location.assign(`/mi-historial.csv?${parametros.toString()}`);
 }
 
 function renderTrendBars(barContainerId, labelContainerId, series) {
@@ -2095,8 +2169,13 @@ Responde SOLO la tabla, sin texto adicional.`,
     resultBox.innerHTML = `
       <div class="result-header ok">📋 Ficha técnica — Fruta</div>
       <div class="result-body">${formatearFichaFruta(r3)}</div>
+      <label class="auth-field" for="farmSelectFruta">Finca asociada (opcional)
+        <select id="farmSelectFruta"><option value="">Sin especificar</option></select>
+      </label>
       <button class="btn-save" id="saveFruta" onclick="guardarAnalisis('fruta')">Guardar datos fruta</button>
+      <a class="btn-save pdf-download" id="pdfFruta" hidden download>Descargar informe PDF</a>
       <div class="save-status" id="saveStatusFruta" aria-live="polite"></div>`;
+    cargarFincasAnalisis();
     resultBox.style.display = 'block';
     resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -2184,8 +2263,13 @@ Responde SOLO la tabla, sin texto adicional.`,
     resultBox.innerHTML = `
       <div class="result-header ok">📋 Ficha técnica — Terreno</div>
       <div class="result-body">${formatearFichaTerreno(r3)}</div>
+      <label class="auth-field" for="farmSelectTerreno">Finca asociada (opcional)
+        <select id="farmSelectTerreno"><option value="">Sin especificar</option></select>
+      </label>
       <button class="btn-save" id="saveTerreno" onclick="guardarAnalisis('terreno')">Guardar datos terreno</button>
+      <a class="btn-save pdf-download" id="pdfTerreno" hidden download>Descargar informe PDF</a>
       <div class="save-status" id="saveStatusTerreno" aria-live="polite"></div>`;
+    cargarFincasAnalisis();
     resultBox.style.display = 'block';
     resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -2249,6 +2333,8 @@ async function guardarEnCSV(tipo, textoRespuesta) {
       recomendacion:     extraerValorTabla(textoRespuesta, 'recomendaci')
     };
   }
+  const selectorFinca = document.getElementById(tipo === 'fruta' ? 'farmSelectFruta' : 'farmSelectTerreno');
+  if (selectorFinca) datos.finca = selectorFinca.value;
 
   const res = await fetch(`/guardar/${tipo}`, {
     method: 'POST',
@@ -2271,6 +2357,11 @@ async function guardarAnalisis(tipo) {
   try {
     const respuesta = await guardarEnCSV(tipo, resultado);
     resultadosPendientes[tipo] = null;
+    const enlacePdf = document.getElementById(tipo === 'fruta' ? 'pdfFruta' : 'pdfTerreno');
+    if (rolActivo === 'USUARIO') {
+      enlacePdf.href = respuesta.pdf_url;
+      enlacePdf.hidden = false;
+    }
     boton.textContent = `Guardado · ${respuesta.total} registros`;
     estado.textContent = respuesta.salud_pct === null
       ? 'Guardado; faltan indicadores concluyentes para puntuarlo.'
