@@ -37,6 +37,35 @@ El servidor crea `.bananacheck_data/bananacheck.db` fuera de las rutas públicas
 
 El porcentaje de salud es orientativo y se calcula con indicadores visibles; no reemplaza una evaluación agronómica.
 
+## Preclasificación de exportación
+
+La salida visual puede distinguir **Internacional**, **Nacional**, **Rechazo** y **No concluyente** cuando hay etiquetas de mercado revisadas. Internacional implica Nacional; Nacional no implica Internacional. Mientras solo se disponga de las etiquetas generales **Exportacion/Rechazo**, una predicción “Exportacion” se mostrará como apta en ambos cuadros según el criterio general del dataset. Esto mantiene coherentes el diagnóstico y las tarjetas, pero no representa una evaluación independiente de cada mercado. La foto tampoco verifica inocuidad, residuos, trazabilidad, calibre real ni requisitos no visibles.
+
+Para distinguir mercados, prepara imágenes revisadas en estas carpetas:
+
+```text
+dataset_exportacion_clasificado/
+  Internacional/
+  Nacional/
+  Rechazo/
+```
+
+Etiqueta cada imagen con criterios escritos y revisión humana. Conserva los originales y copia únicamente imágenes revisadas a las carpetas nuevas. Usa nombres `IMG_YYYYMMDD...` para mantener juntas las fotos de una fecha; hacen falta al menos dos sesiones por categoría. Si tienes el lote o racimo, usa un prefijo compartido como `LOTE-ABC_` o `RACIMO-ABC_` en todos sus archivos para que no se separen aunque tengan fechas distintas.
+
+Si esas carpetas aún no existen, el script usa como **preclasificador general** las etiquetas actuales `dataset/Exportacion/` y `dataset/Rechazo/`. Según `dataset/Referencia.txt`, indican bananos considerados aptos o no aptos para exportar. Una predicción general positiva se refleja como “Sí” en ambos cuadros por la regla acordada; para aprender cuándo una fruta es solo nacional, añade imágenes revisadas en las carpetas nuevas. Las imágenes actuales también están separadas por fecha según su clase (Exportacion: 15 y 18 de noviembre de 2021; Rechazo: del 11 al 14 de noviembre de 2021), lo que puede sesgar el modelo por condiciones de captura. Hay que reunir ejemplos de ambas clases en las mismas sesiones antes de confiar en su generalización.
+
+El archivo `modelo_exportacion.pt` generado en esta copia es un checkpoint experimental de **una época**, creado para comprobar el flujo de inferencia; no debe usarse para decisiones de calidad. Aunque esa época obtuvo 99,3% de exactitud en la partición automática, la separación por fecha coincide con las clases y puede inflar artificialmente el resultado. Completa el entrenamiento y evalúa con lotes/fechas representativos e independientes antes de confiar en el modelo.
+
+Con `requirements_yolo.txt` instalado, prepara y entrena el modelo:
+
+```bash
+python entrenar_exportacion.py
+```
+
+El script crea `dataset_clasificacion/exportacion_binaria/` para el preclasificador actual o `dataset_clasificacion/tres_categorias/` para etiquetas revisadas. Usa una semilla fija y separa sesiones completas. No sobrescribe una carpeta de preparación sin el marcador generado por el script. El modelo queda en `modelo_exportacion.pt` en la raíz del proyecto y el servidor lo carga automáticamente.
+
+El sistema se abstiene por debajo de 0,70 de confianza y muestra **No concluyente**. Ese valor es un umbral inicial, no una probabilidad calibrada ni una garantía de calidad; revísalo con imágenes de validación nuevas y casos difíciles antes de usar la salida. Para mejorar las fotos, captura el fruto completo, enfocado, con luz uniforme y sin filtros; si es posible, fotografía dos caras. La decisión sigue siendo orientativa y requiere inspección humana.
+
 ## Métricas del modelo
 
 El panel staff lee `results.csv` y muestra el máximo registrado por métrica y su época. Cada máximo puede proceder de una época diferente; no es un único checkpoint ni una garantía sobre una predicción individual.

@@ -64,18 +64,70 @@ class BananoDetector:
 
 
 class ExportacionClassifier:
-    """Clasifica imágenes del dataset en Exportacion o Rechazo."""
+    """Clasifica fruta y se abstiene cuando la confianza es insuficiente."""
+
+    UMBRAL_CONFIANZA = 0.70
 
     def __init__(self, model_path=None):
         self.model = None
         if YOLO is not None and model_path and os.path.exists(model_path):
             self.model = YOLO(model_path)
 
+    @classmethod
+    def decidir_categoria(cls, nombre, confianza):
+        """Aplica la relación de categorías y la regla de abstención."""
+        confianza = float(confianza)
+        categoria = str(nombre).strip().casefold()
+        if confianza < cls.UMBRAL_CONFIANZA:
+            return {
+                "clasificacion": "No concluyente",
+                "nivel_exportacion": None,
+                "apto_exportacion": "No concluyente",
+                "apto_nacional": "No concluyente",
+                "apto_internacional": "No concluyente",
+                "confianza": confianza,
+            }
+
+        if categoria == "internacional":
+            nivel = "Internacional"
+            nacional, internacional = "Sí", "Sí"
+        elif categoria == "nacional":
+            nivel = "Nacional"
+            nacional, internacional = "Sí", "No"
+        elif categoria == "rechazo":
+            nivel = "Rechazo"
+            nacional, internacional = "No", "No"
+        elif categoria == "exportacion":
+            return {
+                "clasificacion": "Exportación general (mercado no especificado)",
+                "nivel_exportacion": "General",
+                "apto_exportacion": "Sí",
+                "apto_nacional": "Sí",
+                "apto_internacional": "Sí",
+                "confianza": confianza,
+            }
+        else:
+            raise ValueError(
+                f"Categoría de modelo no reconocida: {nombre!r}. "
+                "Se esperaba Internacional, Nacional, Exportacion o Rechazo."
+            )
+        return {
+            "clasificacion": nivel,
+            "nivel_exportacion": nivel,
+            "apto_exportacion": "No" if nivel == "Rechazo" else "Sí",
+            "apto_nacional": nacional,
+            "apto_internacional": internacional,
+            "confianza": confianza,
+        }
+
     def clasificar(self, image_bytes):
         if self.model is None:
             return {
                 "success": False,
-                "error": "Clasificador no entrenado o ultralytics no instalado",
+                "error": (
+                    "Clasificador no cargado. Ejecuta entrenar_exportacion.py "
+                    "para entrenar con las etiquetas disponibles."
+                ),
                 "clasificacion": None,
                 "confianza": 0,
             }
@@ -88,12 +140,8 @@ class ExportacionClassifier:
             indice = int(resultado.probs.top1)
             confianza = float(resultado.probs.top1conf)
             nombre = str(resultado.names[indice])
-            return {
-                "success": True,
-                "clasificacion": nombre,
-                "confianza": confianza,
-                "apto_exportacion": nombre.lower() == "exportacion",
-            }
+            decision = self.decidir_categoria(nombre, confianza)
+            return {"success": True, **decision}
         except Exception as error:
             return {"success": False, "error": str(error), "clasificacion": None, "confianza": 0}
 
@@ -204,7 +252,7 @@ def inicializar():
 def inicializar_clasificador():
     global clasificador_exportacion
     if clasificador_exportacion is None:
-        modelo = os.path.expanduser("~/Descargas/bananacheck/modelo_exportacion.pt")
+        modelo = Path(__file__).resolve().parent / "modelo_exportacion.pt"
         clasificador_exportacion = ExportacionClassifier(modelo)
     return clasificador_exportacion
 

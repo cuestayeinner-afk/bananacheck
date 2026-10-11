@@ -9,3 +9,7 @@ bananacheck.log*
 analisis_guardados.csv
 fincas.csv
 historial_analisis.csv
+/dataset_clasificacion/exportacion_binaria/
+/dataset_clasificacion/tres_categorias/
+/runs/clasificador_exportacion_binaria/
+/runs/clasificador_tres_categorias/

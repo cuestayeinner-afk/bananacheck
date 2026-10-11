@@ -644,7 +644,7 @@
     </div>
     <div class="card-body">
       <div class="help-box">
-        Sube una foto clara del banano con buena iluminación. El sistema analiza color, textura, defectos y calidad de exportación según normas FAO/UNECE y AUGURA Colombia.
+        Toma la foto con luz uniforme, enfocada y sin filtros; muestra el fruto completo y, si puedes, sus dos caras. La aptitud de exportación es una preclasificación visual orientativa, no una certificación ni una verificación de requisitos del comprador.
       </div>
 
       <div class="preview-wrap" id="previewWrapFruta">
@@ -1779,15 +1779,25 @@ function aplicarDefectosFruta(texto, defectos) {
 }
 
 function aplicarClasificacionExportacion(texto, clasificacion) {
-  if (!clasificacion?.clasificacion) return texto;
-  const valor = clasificacion.clasificacion.toLowerCase() === 'exportacion' ? 'Sí' : 'No';
-  let resultado = texto.replace(
-    /(^\s*\|?\s*Apto exportación internacional[^|\n]*\|\s*)[^|\n]+/im,
+  const reemplazar = (origen, campo, valor) => origen.replace(
+    new RegExp(`(^\\s*\\|?\\s*${campo}[^|\\n]*\\|\\s*)[^|\\n]+`, 'im'),
     `$1${valor}`
   );
+  const valorNacional = clasificacion?.apto_nacional || 'No concluyente';
+  const valorInternacional = clasificacion?.apto_internacional || 'No concluyente';
+  let resultado = reemplazar(texto, 'Apto exportación nacional', valorNacional);
+  resultado = reemplazar(resultado, 'Apto exportación internacional', valorInternacional);
+  let detalle = 'No concluyente: clasificador de exportación no disponible';
+  if (clasificacion?.clasificacion === 'No concluyente') {
+    detalle = `No concluyente: confianza del modelo ${(clasificacion.confianza * 100).toFixed(1)}%, menor al mínimo requerido`;
+  } else if (clasificacion?.nivel_exportacion === 'General') {
+    detalle = `Apto para exportación nacional e internacional según la etiqueta general del dataset (${(clasificacion.confianza * 100).toFixed(1)}% confianza).`;
+  } else if (clasificacion?.clasificacion) {
+    detalle = `Clasificación visual: ${clasificacion.clasificacion} (${(clasificacion.confianza * 100).toFixed(1)}% confianza)`;
+  }
   return resultado.replace(
     /(^\s*\|?\s*Diagnóstico breve[^|\n]*\|\s*)[^|\n]+/im,
-    `$1Clasificación del dataset: ${clasificacion.clasificacion} (${(clasificacion.confianza * 100).toFixed(1)}% confianza)`
+    `$1${detalle}`
   );
 }
 

@@ -912,7 +912,7 @@ class BananaCheckHandler(http.server.SimpleHTTPRequestHandler):
             print(f"❌ Error YOLOv8: {e}")
 
     def _clasificar_exportacion(self):
-        """Clasifica el banano como Exportacion o Rechazo."""
+        """Devuelve la preclasificación visual para los mercados configurados."""
         if not YOLO_DISPONIBLE:
             self._json_response({"success": False, "error": "ultralytics no instalado"}, 503)
             return
